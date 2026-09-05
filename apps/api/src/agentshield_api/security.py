@@ -119,6 +119,8 @@ def _required_roles(path: str, method: str) -> set[str] | None:
         return {ROLE_VIEWER, ROLE_ANALYST, ROLE_ADMIN}
     if path == "/api/v1/risk/metrics" and method == "GET":
         return {ROLE_VIEWER, ROLE_ANALYST, ROLE_ADMIN}
+    if path.startswith("/api/v1/payments/orders/") and path.endswith("/reconcile") and method == "POST":
+        return {ROLE_ANALYST, ROLE_ADMIN}
     return None
 
 
@@ -156,7 +158,7 @@ class ControlPlaneAuthMiddleware(BaseHTTPMiddleware):
                 try:
                     body = await request.body()
                     payload = json.loads(body)
-                except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                except (UnicodeDecodeError, json.JSONDecodeError):
                     return _auth_error_response(
                         request,
                         HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid_review_payload"),
