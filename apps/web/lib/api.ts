@@ -45,6 +45,36 @@ export type RiskMetrics = {
   allowed: number;
 };
 
+export type PolicyItem = {
+  id: string;
+  agent_id: string;
+  version: number;
+  is_active: boolean;
+  rules: Record<string, unknown>;
+  created_at: string;
+};
+
+export type ModelItem = {
+  version: string;
+  status: string;
+  artifact_sha256: string;
+  metrics: Record<string, unknown>;
+  training_config: Record<string, unknown>;
+  created_at: string;
+};
+
+export type AuditItem = {
+  id: string;
+  transaction_id: string | null;
+  event_type: string;
+  actor_type: string;
+  actor_id: string | null;
+  payload: Record<string, unknown>;
+  occurred_at: string;
+};
+
+export type HealthResponse = { status: string; reason?: string };
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/v1${path}`, {
     ...init,
@@ -65,6 +95,10 @@ export const getRiskQueue = (params: { limit?: number; offset?: number; decision
   return api<RiskQueueResponse>(`/risk/transactions?${search.toString()}`);
 };
 export const getTransaction = (id: string) => api<TransactionDetail>(`/risk/transactions/${id}`);
+export const getPolicies = () => api<PolicyItem[]>('/policies');
+export const getModels = () => api<ModelItem[]>('/models');
+export const getAudit = (limit = 100) => api<AuditItem[]>(`/audit?limit=${limit}`);
+export const getHealth = () => api<HealthResponse>('/health/ready', { cache: 'no-store' });
 
 export const createReview = (id: string, body: { reviewer_id: string; outcome: 'APPROVE' | 'REJECT' | 'ESCALATE'; note?: string }) =>
   api<TransactionDetail['reviews'][number]>(`/risk/transactions/${id}/review`, {
