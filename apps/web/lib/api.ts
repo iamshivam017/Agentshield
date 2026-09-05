@@ -25,8 +25,15 @@ export type RiskQueueResponse = {
   offset: number;
 };
 
+export type TransactionFeatureSet = {
+  version: string;
+  values: Record<string, number>;
+  computed_at: string;
+};
+
 export type TransactionDetail = {
   transaction: RiskQueueItem;
+  features: TransactionFeatureSet | null;
   prediction: { model_version: string; score: string; risk_band: string; signals: { signals?: string[] }; created_at: string } | null;
   policy_evaluation: { policy_version: number; result: string; violations: string[]; evaluated_at: string } | null;
   decision_record: { decision: Decision; risk_score: string; risk_band: string; model_version: string; policy_version: number; reason_codes: string[] } | null;
