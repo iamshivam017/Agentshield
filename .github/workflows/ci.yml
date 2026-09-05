@@ -14,6 +14,20 @@ jobs:
     defaults:
       run:
         shell: bash
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: agentshield
+          POSTGRES_PASSWORD: agentshield
+          POSTGRES_DB: agentshield
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agentshield -d agentshield"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -29,6 +43,11 @@ jobs:
         run: PYTHONPATH=apps/api/src:apps/api python -m ruff check apps/api
       - name: Type-check API
         run: PYTHONPATH=apps/api/src:apps/api python -m mypy apps/api/app apps/api/src
+      - name: Validate live database migrations
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql+psycopg://agentshield:agentshield@localhost:5432/agentshield
+        run: PYTHONPATH=src alembic upgrade head
       - name: Test API
         run: PYTHONPATH=apps/api/src:apps/api pytest -q apps/api/tests
       - name: Dependency audit
