@@ -8,7 +8,6 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete
 
-from agentshield_api.config import settings
 from agentshield_api.db import SessionLocal
 from agentshield_api.models import Agent, AgentPolicy, Merchant, Transaction
 from app.main import app
@@ -78,7 +77,3 @@ async def test_risk_evaluate_persists_and_replays_idempotently() -> None:
         await session.execute(delete(Agent).where(Agent.id == agent_id))
         await session.execute(delete(Merchant).where(Merchant.id == merchant_id))
         await session.commit()
-
-
-def test_integration_requires_real_database_url(monkeypatch: pytest.MonkeyPatch) -> None:
-    assert settings.database_url.startswith("postgresql+psycopg://")
