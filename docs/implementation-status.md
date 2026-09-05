@@ -47,7 +47,8 @@
 - [x] Schema contract tests
 - [x] Alembic migration-chain tests
 - [x] Migration execution against a live PostgreSQL service in CI
-- [ ] Integration tests for transactions/concurrency/idempotency against PostgreSQL
+- [x] PostgreSQL integration coverage for transaction/idempotency invariants
+- [ ] Concurrent multi-request budget stress test
 - [ ] Database backup/restore verification
 
 ## M16 — Synthetic Dataset + Risk Model
@@ -65,8 +66,9 @@
 - [x] Candidate XGBoost comparison implementation
 - [x] Calibration analysis implementation (Brier + ECE)
 - [x] Artifact SHA-256 checksum generation and registry metadata
-- [ ] Runtime training execution with measured metrics captured from this environment
-- [ ] Approved/ACTIVE artifact loaded by API serving path
+- [x] CI runtime training smoke with verified artifact hand-off
+- [x] API serving path verifies model artifact checksum before load
+- [ ] Final trained model promoted to APPROVED/ACTIVE with persisted registry workflow
 
 ## M17 — Risk Decision API
 
@@ -96,9 +98,11 @@
 - [x] Human review endpoint with audit event
 - [x] Policy/model/audit read APIs
 - [x] Risk metrics API
-- [ ] Runtime API integration tests against PostgreSQL
+- [x] Production/staging control-plane authentication enforcement
+- [x] Viewer/analyst/admin role separation
+- [x] Server-trusted reviewer identity binding
 - [ ] Redis-backed distributed rate limiting
-- [ ] Trained model artifact integration
+- [ ] Full API integration suite in production-like environment
 
 ## M18 — Razorpay Test Mode Payment Integration
 
@@ -114,6 +118,7 @@
 - [ ] Live Razorpay Test Mode credential execution
 - [ ] Webhook replay/out-of-order integration tests
 - [ ] Provider reconciliation path
+- [ ] Deterministic mock provider in core test suite
 
 ## M19 — Risk Analyst Command Center
 
@@ -129,12 +134,24 @@
 - [x] Human review actions from investigation workspace
 - [x] Real audit trail rendering
 - [x] API proxy configuration for local web/API split
-- [ ] Policy management UI
-- [ ] Model evaluation UI
-- [ ] Audit explorer page
-- [ ] System health detail page
+- [x] Policy/model/audit/system-health control-plane screens
+- [x] Browser E2E suite in CI
+- [ ] Authenticated control-plane browser flow
 - [ ] Accessibility automated audit
-- [ ] Browser E2E tests
+
+## Security & Operations
+
+- [x] Operator role-specific credential configuration
+- [x] Least-privilege control-plane routing
+- [x] Reviewer identity cannot be selected independently of authenticated operator
+- [x] Test Mode boundary enforced for Razorpay credentials
+- [x] Model artifact integrity check via SHA-256
+- [x] Prompt/LLM authority boundary documented
+- [ ] Centralized metrics/telemetry backend
+- [ ] Operational alert rules and runbooks
+- [ ] Load/stress/soak benchmark suite
+- [ ] IaC for target deployment environment
+- [ ] Backup/restore drill
 
 ## CI verification
 
@@ -150,11 +167,10 @@
 - [x] ML dependency audit
 - [x] API + web container builds
 - [x] Live PostgreSQL migration check
-- [ ] End-to-end browser test execution in CI
-- [ ] Runtime ML training smoke execution in CI
+- [x] Browser E2E execution in CI
+- [x] Runtime ML training smoke execution in CI
+- [x] Trained smoke artifact checksum verification in API CI
 
 ## Next checkpoint
 
-Complete and verify the runtime ML training smoke, then integrate a checksum-verified trained artifact into the production API serving path. In parallel, add PostgreSQL-backed API integration coverage for transaction persistence, idempotency, concurrency/budget reservation, and the remaining M19 control-plane screens.
-
-The repository has now passed API/web/ML static checks, dependency audits, and container builds in GitHub Actions. The live migration gate is also part of CI and has passed in the observed run; runtime ML training remains pending until its new smoke step completes successfully.
+Complete the payment lifecycle hardening (provider abstraction, deterministic mock, replay/out-of-order reconciliation), then build the investigation/evidence pipeline with explicit provenance and a non-authoritative LLM explanation layer. After that, add centralized observability, performance benchmarks, deployment/rollback artifacts, and the five-reviewer production gap audit.
