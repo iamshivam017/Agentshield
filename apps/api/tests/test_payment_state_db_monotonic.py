@@ -19,6 +19,8 @@ async def test_database_keeps_payment_capture_terminal() -> None:
     transaction_id = uuid4()
     payment_order_id = uuid4()
     provider_payment_id = uuid4()
+    provider_payment_token = f"pay_db_{uuid4().hex}"
+    provider_order_id = f"order_db_{uuid4().hex}"
 
     async with SessionLocal() as session:
         session.add(Agent(id=agent_id, name="DB State Agent", status="ACTIVE"))
@@ -41,7 +43,7 @@ async def test_database_keeps_payment_capture_terminal() -> None:
                 id=payment_order_id,
                 transaction_id=transaction_id,
                 provider="mock",
-                provider_order_id=f"order_db_{uuid4().hex}",
+                provider_order_id=provider_order_id,
                 state="PAYMENT_CAPTURED",
                 amount_minor=2500,
                 currency="INR",
@@ -50,7 +52,7 @@ async def test_database_keeps_payment_capture_terminal() -> None:
         session.add(
             ProviderPayment(
                 id=provider_payment_id,
-                provider_payment_id=f"pay_db_{uuid4().hex}",
+                provider_payment_id=provider_payment_token,
                 payment_order_id=payment_order_id,
                 state="PAYMENT_CAPTURED",
                 raw_event={"source": "test"},
@@ -66,7 +68,9 @@ async def test_database_keeps_payment_capture_terminal() -> None:
         payment_order.state = "PAYMENT_AUTHORIZED"
         provider_payment.state = "PAYMENT_FAILED"
         await session.commit()
+        await session.close()
 
+    async with SessionLocal() as session:
         refreshed_order = await session.scalar(select(PaymentOrder).where(PaymentOrder.id == payment_order_id))
         refreshed_payment = await session.scalar(select(ProviderPayment).where(ProviderPayment.id == provider_payment_id))
         assert refreshed_order is not None
