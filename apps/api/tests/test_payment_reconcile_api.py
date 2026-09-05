@@ -40,6 +40,7 @@ async def test_mock_payment_reconciliation_updates_state_and_audit(monkeypatch: 
                 status="EVALUATED",
             )
         )
+        await session.flush()
         session.add(
             PaymentOrder(
                 id=payment_order_id,
