@@ -149,6 +149,27 @@
 - [ ] Authenticated control-plane browser flow
 - [ ] Accessibility automated audit
 
+## M20 — Investigation, AI Safety & Observability
+
+- [x] Evidence builder with explicit provenance and trust levels
+- [x] Evidence SHA-256 digest
+- [x] Persisted investigation result and evidence hash
+- [x] Read-only LLM provider boundary
+- [x] Structured LLM output validation
+- [x] Unsupported evidence citation rejection
+- [x] LLM authority-boundary phrase rejection
+- [x] Deterministic fallback when LLM is unavailable or invalid
+- [x] Investigation persistence integration coverage
+- [x] Request telemetry middleware
+- [x] Correlation ID propagation
+- [x] Prometheus-compatible `/metrics` endpoint
+- [x] Low-cardinality domain telemetry primitives
+- [x] Investigation and payment reconciliation telemetry
+- [x] Observability contract documentation
+- [x] Baseline alert rules
+- [x] Operational incident runbooks
+- [x] k6 risk-evaluation load profile
+
 ## Security & Operations
 
 - [x] Operator role-specific credential configuration
@@ -157,9 +178,12 @@
 - [x] Test Mode boundary enforced for Razorpay credentials
 - [x] Model artifact integrity check via SHA-256
 - [x] Prompt/LLM authority boundary documented
-- [ ] Centralized metrics/telemetry backend
-- [ ] Operational alert rules and runbooks
-- [ ] Load/stress/soak benchmark suite
+- [x] Request/correlation telemetry foundation
+- [x] Metrics and alert contract
+- [x] Incident runbooks
+- [ ] Centralized multi-instance metrics backend deployment
+- [ ] Redis-backed distributed rate limiting
+- [ ] Load/stress/soak benchmark execution against target environment
 - [ ] IaC for target deployment environment
 - [ ] Backup/restore drill
 
@@ -183,4 +207,4 @@
 
 ## Next checkpoint
 
-Build the investigation/evidence pipeline with explicit provenance, trust levels, evidence hashing, structured AI output validation, deterministic fallback, and a non-authoritative LLM explanation layer. After that, add centralized observability, performance benchmarks, deployment/rollback artifacts, and the five-reviewer production gap audit.
+Complete centralized multi-instance telemetry, execute the k6 performance profile in a target-like environment, finish final model APPROVED/ACTIVE promotion, add deployment/IaC/rollback artifacts, run backup/restore and concurrent-budget drills, then perform the five-reviewer production gap audit and final readiness scorecard.
