@@ -44,6 +44,7 @@ async def test_stale_webhook_cannot_regress_captured_payment(monkeypatch: pytest
                 status="PAYMENT_CAPTURED",
             )
         )
+        await session.flush()
         session.add(
             PaymentOrder(
                 id=payment_order_id,
@@ -94,9 +95,7 @@ async def test_stale_webhook_cannot_regress_captured_payment(monkeypatch: pytest
 
     async with SessionLocal() as session:
         order = await session.scalar(select(PaymentOrder).where(PaymentOrder.id == payment_order_id))
-        payment = await session.scalar(
-            select(ProviderPayment).where(ProviderPayment.provider_payment_id == provider_payment_id)
-        )
+        payment = await session.scalar(select(ProviderPayment).where(ProviderPayment.provider_payment_id == provider_payment_id))
         assert order is not None
         assert payment is not None
         assert order.state == "PAYMENT_CAPTURED"
