@@ -26,19 +26,17 @@ def upgrade() -> None:
         LANGUAGE plpgsql
         AS $$
         BEGIN
-            RAISE EXCEPTION 'agent policy versions are immutable';
+            IF NEW.agent_id <> OLD.agent_id
+               OR NEW.version <> OLD.version
+               OR NEW.rules <> OLD.rules THEN
+                RAISE EXCEPTION 'agent policy versions are immutable';
+            END IF;
+            RETURN NEW;
         END;
         $$
         """
     )
-    op.execute(
-        """
-        DROP TRIGGER IF EXISTS trg_agent_policy_immutable ON agent_policies
-        """
-    )
-    # Policy deletion remains governed by the owning agent's lifecycle.
-    # Application APIs never expose policy deletion; UPDATE is blocked so
-    # historical policy contents and activation state cannot be rewritten.
+    op.execute("DROP TRIGGER IF EXISTS trg_agent_policy_immutable ON agent_policies")
     op.execute(
         """
         CREATE TRIGGER trg_agent_policy_immutable
