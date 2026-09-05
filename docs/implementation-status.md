@@ -30,8 +30,26 @@
 - [x] Web standalone build configuration
 - [x] Non-root API container user
 
+## M15 — Database & Migrations
+
+- [x] Async SQLAlchemy engine/session foundation
+- [x] PostgreSQL domain model layer
+- [x] Core AgentShield schema migration
+- [x] Risk/AI/payment schema migration
+- [x] Transaction, prediction, policy-evaluation, decision persistence
+- [x] Investigation and human-review persistence
+- [x] Model/evaluation registry persistence
+- [x] Idempotency persistence
+- [x] Agent budget state for transactional concurrency control
+- [x] Payment order/provider-payment state
+- [x] Webhook event deduplication key
+- [x] Audit-event persistence
+- [ ] Migration execution against a live local database
+- [ ] Integration tests for transactions/concurrency/idempotency
+- [ ] Database backup/restore verification
+
 ## Next checkpoint
 
-M15 — Database and migrations.
+M15.1 — Migration verification + persistence integration tests.
 
-The repository now has a stable runtime target for persistence work. M15 will implement SQLAlchemy/Alembic configuration, domain models, constraints, indexes, transaction boundaries, and migration verification before moving into synthetic data and ML work.
+The schema and ORM foundations are now committed. Before ML work begins, migrations must be executed against the local PostgreSQL service and persistence behavior must be verified under expected, invalid, failure, idempotency, and concurrency cases.
