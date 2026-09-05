@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
@@ -186,8 +186,13 @@ def api_version() -> dict[str, str]:
 
 
 @app.post("/api/v1/risk/evaluate", response_model=RiskEvaluateResponse, tags=["risk"])
-async def evaluate_risk(request: RiskEvaluateRequest, session: AsyncSession = Depends(get_session)) -> RiskEvaluateResponse:
-    authorize_agent(request.agent_id)
+async def evaluate_risk(
+    request: RiskEvaluateRequest,
+    x_agent_api_key: str | None = Header(default=None),
+    x_agent_id: UUID | None = Header(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> RiskEvaluateResponse:
+    authorize_agent(request.agent_id, x_agent_api_key, x_agent_id)
     scope = f"risk:evaluate:{request.agent_id}"
     req_hash = request_hash(request)
     replay = await claim_or_replay_idempotency(session, scope=scope, key=request.idempotency_key, request_hash_value=req_hash)
