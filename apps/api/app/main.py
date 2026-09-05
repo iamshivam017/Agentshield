@@ -53,6 +53,7 @@ from agentshield_api.rate_limit import rate_limiter
 from agentshield_api.risk import PolicyContext, RiskAssessment, classify_score, decide, evaluate_policy
 from agentshield_api.security import authorize_agent
 from app.payment_contracts import PaymentOrderRequest, PaymentOrderResponse
+from app.payment_state import monotonic_state_update, razorpay_event_state
 from app.razorpay import PaymentProviderError, RazorpayTestProvider, verify_webhook_signature
 
 app = FastAPI(title="AgentShield API", version="0.1.0", description="Defense-only AI risk and trust layer for agentic payments.")
@@ -405,24 +406,24 @@ async def razorpay_webhook(request: Request, session: AsyncSession = Depends(get
         await session.rollback()
         return {"status": "duplicate_ignored"}
     event_type = payload.get("event")
+    incoming_state = razorpay_event_state(event_type).value
     session.add(WebhookEvent(id=uuid4(), provider="razorpay", provider_event_id=event_id, signature_valid=True, event_type=event_type, payload_hash=hashlib.sha256(raw_body).hexdigest(), processed=False, payload=payload))
     payment = payload.get("payload", {}).get("payment", {}).get("entity", {}) or {}
     provider_payment_id = payment.get("id")
     order_id = payment.get("order_id")
-    state = {"payment.authorized": "PAYMENT_AUTHORIZED", "payment.captured": "PAYMENT_CAPTURED", "payment.failed": "PAYMENT_FAILED"}.get(str(event_type), "PAYMENT_UNKNOWN")
     if isinstance(provider_payment_id, str) and provider_payment_id:
         provider_payment = await session.scalar(select(ProviderPayment).where(ProviderPayment.provider_payment_id == provider_payment_id))
         if provider_payment is None:
             payment_order = await session.scalar(select(PaymentOrder).where(PaymentOrder.provider_order_id == order_id)) if isinstance(order_id, str) else None
-            session.add(ProviderPayment(id=uuid4(), provider_payment_id=provider_payment_id, payment_order_id=payment_order.id if payment_order else None, state=state, raw_event=payload))
+            session.add(ProviderPayment(id=uuid4(), provider_payment_id=provider_payment_id, payment_order_id=payment_order.id if payment_order else None, state=incoming_state, raw_event=payload))
         else:
-            provider_payment.state = state
+            provider_payment.state = monotonic_state_update(provider_payment.state, incoming_state)
             provider_payment.raw_event = payload
     if isinstance(order_id, str):
         payment_order = await session.scalar(select(PaymentOrder).where(PaymentOrder.provider_order_id == order_id))
         if payment_order is not None:
-            payment_order.state = state
-            if state == "PAYMENT_CAPTURED":
+            payment_order.state = monotonic_state_update(payment_order.state, incoming_state)
+            if payment_order.state == "PAYMENT_CAPTURED":
                 transaction = await session.scalar(select(Transaction).where(Transaction.id == payment_order.transaction_id))
                 if transaction is not None:
                     transaction.status = "PAYMENT_CAPTURED"
