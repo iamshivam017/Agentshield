@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .contracts import PolicyCreateRequest, PolicyItem
 from .db import get_session
 from .models import Agent, AgentPolicy, AuditEvent
-from .security import authorize_operator
+from .security import ROLE_ADMIN, authorize_operator, install_control_plane_security
 
 router = APIRouter(prefix="/api/v1/policies", tags=["policies"])
 
@@ -28,7 +28,7 @@ async def create_policy(
     x_operator_id: str | None = Header(default=None),
     session: AsyncSession = Depends(get_session),
 ) -> PolicyItem:
-    operator_id = authorize_operator(x_operator_api_key, x_operator_id)
+    operator_id = authorize_operator(x_operator_api_key, x_operator_id, {ROLE_ADMIN})
     await session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _lock_key(str(request.agent_id))})
 
     agent = await session.scalar(select(Agent).where(Agent.id == request.agent_id))
@@ -92,3 +92,4 @@ async def create_policy(
 
 def register_policy_routes(app) -> None:
     app.include_router(router)
+    install_control_plane_security(app)
