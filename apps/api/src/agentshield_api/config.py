@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     require_agent_auth: bool = False
     rate_limit_requests: int = 60
     rate_limit_window_seconds: int = 60
+    risk_model_artifact_path: str | None = None
+    risk_model_artifact_sha256: str | None = None
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
     razorpay_webhook_secret: str = ""
