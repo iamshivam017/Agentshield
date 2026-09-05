@@ -8,6 +8,7 @@ from typing import Protocol
 
 import httpx
 
+from agentshield_api.observability import telemetry
 from app.payment_state import PaymentState
 
 
@@ -179,6 +180,10 @@ class RazorpayTestProvider:
 def verify_webhook_signature(*, raw_body: bytes, received_signature: str, secret: str) -> bool:
     """Validate Razorpay HMAC-SHA256 against the untouched request body."""
     if not secret or not received_signature:
+        telemetry.increment("payment_webhook_events_total", provider="razorpay", event_type="invalid_signature", state="REJECTED")
         return False
     expected = hmac.new(secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, received_signature)
+    valid = hmac.compare_digest(expected, received_signature)
+    if not valid:
+        telemetry.increment("payment_webhook_events_total", provider="razorpay", event_type="invalid_signature", state="REJECTED")
+    return valid
