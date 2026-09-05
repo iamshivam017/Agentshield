@@ -119,7 +119,8 @@ class PolicyCreateRequest(BaseModel):
                 raise ValueError(f"invalid_policy_rule:{key}") from exc
             if not value.is_finite() or value <= Decimal("0"):
                 raise ValueError(f"invalid_policy_rule:{key}")
-            if key != "verification_threshold" and value.as_tuple().exponent < -2:
+            exponent = value.as_tuple().exponent
+            if key != "verification_threshold" and isinstance(exponent, int) and exponent < -2:
                 raise ValueError(f"invalid_policy_rule:{key}")
             if key == "verification_threshold" and value > Decimal("1"):
                 raise ValueError(f"invalid_policy_rule:{key}")
