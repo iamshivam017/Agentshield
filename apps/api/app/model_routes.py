@@ -66,6 +66,17 @@ async def _authorized_transition(
     return await _transition(version, target, operator_id=operator_id, session=session)
 
 
+@router.post("/{version}/evaluate", response_model=dict[str, object])
+async def evaluate_model(
+    version: str,
+    x_operator_api_key: str | None = Header(default=None),
+    x_operator_id: str | None = Header(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, object]:
+    model = await _authorized_transition(version, "EVALUATED", x_operator_api_key, x_operator_id, session)
+    return {"version": model.version, "status": model.status}
+
+
 @router.post("/{version}/candidate", response_model=dict[str, object])
 async def candidate_model(
     version: str,
