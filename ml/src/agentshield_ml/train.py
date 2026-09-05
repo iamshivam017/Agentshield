@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 from dataclasses import asdict
@@ -8,7 +9,6 @@ from pathlib import Path
 import joblib
 import numpy as np
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import average_precision_score, roc_auc_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
@@ -54,8 +54,10 @@ def model_metrics(y_true: np.ndarray, probabilities: np.ndarray, threshold: floa
     }
 
 
-def train(output_dir: str = "artifacts/risk") -> dict:
-    transactions = generate_transactions(SyntheticConfig(rows=ROWS, seed=SEED))
+def train(output_dir: str = "artifacts/risk", rows: int = ROWS, seed: int = SEED) -> dict:
+    if rows < 100:
+        raise ValueError("rows must be at least 100")
+    transactions = generate_transactions(SyntheticConfig(rows=rows, seed=seed))
     x, y = build_features(transactions)
     train_slice, validation_slice, test_slice = chronological_split(len(x))
     x_train, y_train = x.iloc[train_slice], y.iloc[train_slice]
@@ -64,7 +66,7 @@ def train(output_dir: str = "artifacts/risk") -> dict:
 
     logistic = Pipeline([
         ("scale", StandardScaler()),
-        ("classifier", LogisticRegression(max_iter=1000, class_weight="balanced", random_state=SEED)),
+        ("classifier", LogisticRegression(max_iter=1000, class_weight="balanced", random_state=seed)),
     ])
     logistic.fit(x_train, y_train)
     logistic_validation = logistic.predict_proba(x_validation)[:, 1]
@@ -87,7 +89,7 @@ def train(output_dir: str = "artifacts/risk") -> dict:
         objective="binary:logistic",
         eval_metric="logloss",
         scale_pos_weight=negative / positive,
-        random_state=SEED,
+        random_state=seed,
         n_jobs=2,
     )
     xgb.fit(x_train, y_train)
@@ -138,7 +140,7 @@ def train(output_dir: str = "artifacts/risk") -> dict:
         "selected_candidate": selected_name,
         "dataset_version": DATASET_VERSION,
         "feature_version": FEATURE_VERSION,
-        "seed": SEED,
+        "seed": seed,
         "rows": len(transactions),
         "split": {
             "train": train_slice.stop - train_slice.start,
@@ -181,5 +183,14 @@ def train(output_dir: str = "artifacts/risk") -> dict:
     return metadata
 
 
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Train and evaluate AgentShield risk models.")
+    parser.add_argument("--rows", type=int, default=ROWS)
+    parser.add_argument("--seed", type=int, default=SEED)
+    parser.add_argument("--output-dir", default="artifacts/risk")
+    args = parser.parse_args()
+    print(json.dumps(train(output_dir=args.output_dir, rows=args.rows, seed=args.seed), indent=2))
+
+
 if __name__ == "__main__":
-    print(json.dumps(train(), indent=2))
+    main()
