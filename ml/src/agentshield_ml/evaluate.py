@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from sklearn.metrics import average_precision_score, confusion_matrix, f1_score, precision_score, recall_score, roc_auc_score
+from sklearn.metrics import average_precision_score, brier_score_loss, confusion_matrix, f1_score, precision_score, recall_score, roc_auc_score
 
 
 @dataclass(frozen=True)
@@ -45,6 +45,24 @@ def evaluate_threshold(
         false_positive_cost=float(fp * false_positive_cost),
         false_negative_cost=float(fn * false_negative_cost),
     )
+
+
+def calibration_metrics(y_true: np.ndarray, probabilities: np.ndarray, *, bins: int = 10) -> dict[str, float]:
+    """Measure probability calibration without using labels to choose a threshold."""
+    if probabilities.size == 0:
+        raise ValueError("probabilities must not be empty")
+    clipped = np.clip(probabilities, 0.0, 1.0)
+    brier = brier_score_loss(y_true, clipped)
+    edges = np.linspace(0.0, 1.0, bins + 1)
+    ece = 0.0
+    for left, right in zip(edges[:-1], edges[1:]):
+        mask = (clipped >= left) & (clipped < right if right < 1.0 else clipped <= right)
+        if not np.any(mask):
+            continue
+        confidence = float(np.mean(clipped[mask]))
+        accuracy = float(np.mean(y_true[mask]))
+        ece += float(np.mean(mask)) * abs(confidence - accuracy)
+    return {"brier_score": float(brier), "expected_calibration_error": float(ece), "bins": float(bins)}
 
 
 def select_threshold(
