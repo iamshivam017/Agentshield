@@ -185,6 +185,7 @@ export default function Page() {
 function InvestigationView({ detail, busy, onReview }: { detail: TransactionDetail; busy: boolean; onReview: (outcome: 'APPROVE' | 'REJECT' | 'ESCALATE') => void }) {
   const item = detail.transaction;
   const signalList = detail.prediction?.signals?.signals ?? item.reason_codes;
+  const featureValues = detail.features?.values;
 
   return (
     <div className="investigation-layout">
@@ -198,6 +199,20 @@ function InvestigationView({ detail, busy, onReview }: { detail: TransactionDeta
         </div><div className="signal-list">{signalList.map(signal => <span key={signal} className="evidence-chip">{signal}</span>)}</div></section>
         <section className="panel"><div className="panel-head"><div><span className="eyebrow">Policy evaluation</span><h2>Authority check</h2></div></div><div className="kv-list"><div><span>Decision</span><b>{detail.policy_evaluation?.result ?? item.decision}</b></div><div><span>Violations</span><b>{detail.policy_evaluation?.violations.length ? detail.policy_evaluation.violations.join(', ') : 'None recorded'}</b></div><div><span>Payment order</span><b>{detail.payment_order?.provider_order_id ?? 'Not created'}</b></div></div></section>
       </div>
+      {featureValues && (
+        <section className="panel">
+          <div className="panel-head"><div><span className="eyebrow">Derived features</span><h2>Point-in-time inputs</h2></div><span className="live-badge">FEATURE {detail.features?.version ?? 'unknown'}</span></div>
+          <div className="evidence-grid">
+            <EvidenceCard title="Amount" value={featureValues.amount.toFixed(2)} />
+            <EvidenceCard title="New device" value={featureValues.new_device ? 'Yes' : 'No'} />
+            <EvidenceCard title="New merchant" value={featureValues.new_merchant ? 'Yes' : 'No'} />
+            <EvidenceCard title="1h velocity" value={featureValues.agent_count_1h_prior.toFixed(0)} />
+            <EvidenceCard title="Agent history" value={featureValues.agent_tx_count_prior.toFixed(0)} />
+            <EvidenceCard title="Agent avg" value={featureValues.agent_amount_mean_prior.toFixed(2)} />
+          </div>
+          <p className="muted scenario-note">Historical features are computed strictly before the transaction event and persisted with the decision.</p>
+        </section>
+      )}
       <section className="panel review-panel"><div><span className="eyebrow">Human oversight</span><h2>Review decision</h2><p className="muted">Record an analyst outcome; the review is appended to the audit stream.</p></div><div className="review-actions"><button className="quiet" disabled={busy} onClick={() => onReview('ESCALATE')}>Escalate</button><button className="quiet" disabled={busy} onClick={() => onReview('REJECT')}>Reject</button><button className="primary" disabled={busy} onClick={() => onReview('APPROVE')}>Approve</button></div></section>
       <section className="panel"><div className="panel-head"><div><span className="eyebrow">Audit trail</span><h2>Immutable events</h2></div></div><div className="timeline">{detail.audit_events.map(event => <div className="timeline-row" key={event.id}><span className="dot"/><div><b>{event.event_type}</b><small>{event.actor_type}{event.actor_id ? ` · ${event.actor_id}` : ''} · {new Date(event.occurred_at).toLocaleString()}</small></div></div>)}</div></section>
     </div>
