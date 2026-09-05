@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from uuid import uuid4
 
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .config import settings
 from .contracts import PolicyCreateRequest, PolicyItem
 from .db import get_session
 from .models import Agent, AgentPolicy, AuditEvent
@@ -26,7 +26,7 @@ async def create_policy(
     request: PolicyCreateRequest,
     x_operator_api_key: str | None = Header(default=None),
     x_operator_id: str | None = Header(default=None),
-    session: AsyncSession = get_session(),
+    session: AsyncSession = Depends(get_session),
 ) -> PolicyItem:
     operator_id = authorize_operator(x_operator_api_key, x_operator_id)
     await session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _lock_key(str(request.agent_id))})
@@ -58,7 +58,7 @@ async def create_policy(
     )
     session.add(policy)
     rules_hash = hashlib.sha256(
-        str(sorted(request.rules.items())).encode()
+        json.dumps(request.rules, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
     session.add(
         AuditEvent(
