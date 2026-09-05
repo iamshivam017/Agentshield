@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
 
+from .observability import telemetry
+
 
 class RiskBand(StrEnum):
     LOW = "LOW"
@@ -64,16 +66,21 @@ def evaluate_policy(context: PolicyContext, version: int) -> PolicyResult:
         violations.append("DAILY_LIMIT_EXCEEDED")
     if not context.category_allowed:
         violations.append("CATEGORY_RESTRICTED")
+    for reason in violations:
+        telemetry.increment("policy_violations_total", reason=reason)
     return PolicyResult(version=version, violations=violations)
 
 
 def decide(assessment: RiskAssessment, policy: PolicyResult, verification_threshold: Decimal) -> Decision:
     if policy.hard_violation:
-        return Decision.BLOCK
-    if assessment.band is RiskBand.HIGH:
-        return Decision.BLOCK
-    if assessment.band is RiskBand.MEDIUM:
-        return Decision.VERIFY
-    if assessment.score >= verification_threshold:
-        return Decision.VERIFY
-    return Decision.ALLOW
+        result = Decision.BLOCK
+    elif assessment.band is RiskBand.HIGH:
+        result = Decision.BLOCK
+    elif assessment.band is RiskBand.MEDIUM:
+        result = Decision.VERIFY
+    elif assessment.score >= verification_threshold:
+        result = Decision.VERIFY
+    else:
+        result = Decision.ALLOW
+    telemetry.increment("risk_decisions_total", decision=result.value, risk_band=assessment.band.value)
+    return result
