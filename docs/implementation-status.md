@@ -76,20 +76,27 @@
 - [x] Development-only heuristic provider
 - [x] Agent/merchant/policy persistence lookup
 - [x] Risk prediction and decision persistence
+- [x] Policy evaluation persistence
+- [x] Risk decision audit event
 - [x] Hard policy violations override model outcome
 - [x] Production mode refuses service without an active model artifact
 - [x] Payment creation explicitly excluded from risk evaluation vertical slice
-- [x] Unit coverage for core decision invariants
+- [x] Idempotency enforcement with request fingerprinting
+- [x] PostgreSQL advisory-lock serialization for same idempotency key
+- [x] Agent API-key authentication boundary
+- [x] Agent identity binding to request body
+- [x] Transactional daily budget reservation with row locking
+- [x] Structured validation error envelope
+- [x] Request ID propagation
+- [x] Security response headers
+- [x] Bounded in-process rate limiting
+- [x] Unit coverage for security-control invariants
 - [ ] Runtime API integration tests against PostgreSQL
-- [ ] Request authentication/authorization
-- [ ] Idempotency enforcement in endpoint
-- [ ] Transactional agent budget reservation
+- [ ] Redis-backed distributed rate limiting
 - [ ] Trained model artifact integration
-- [ ] Structured API error envelope and request IDs
-- [ ] Rate limiting
 
 ## Next checkpoint
 
-M15.1 / M16 runtime verification, followed by completion of M17 production controls.
+M15.1 — Live PostgreSQL migration + persistence integration verification.
 
-The first end-to-end risk vertical slice is now wired: validate request → load agent/policy → score → evaluate policy → decide → persist prediction/decision. The provider integration is intentionally not performed by this endpoint, so ALLOW does not imply that a payment order was created.
+The risk endpoint now has its first production-control layer. Runtime database execution remains the gate before claiming end-to-end persistence correctness. After that, execute the ML training pipeline, record real held-out metrics, activate the artifact, and then integrate the Razorpay Test Mode payment adapter.
