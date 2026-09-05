@@ -80,12 +80,11 @@
 - [x] Risk decision audit event
 - [x] Hard policy violations override model outcome
 - [x] Production mode refuses service without an active model artifact
-- [x] Payment creation explicitly excluded from risk evaluation vertical slice
 - [x] Idempotency enforcement with request fingerprinting
 - [x] PostgreSQL advisory-lock serialization for same idempotency key
 - [x] Agent API-key authentication boundary
 - [x] Agent identity binding to request body
-- [x] Transactional daily budget reservation with row locking
+- [x] Transactional daily budget reservation primitive
 - [x] Structured validation error envelope
 - [x] Request ID propagation
 - [x] Security response headers
@@ -95,8 +94,25 @@
 - [ ] Redis-backed distributed rate limiting
 - [ ] Trained model artifact integration
 
+## M18 — Razorpay Test Mode Payment Integration
+
+- [x] Razorpay Test Mode provider adapter
+- [x] Non-Test-Mode credential rejection
+- [x] Decimal-to-provider-subunit conversion
+- [x] ALLOW-only order creation boundary
+- [x] Payment order persistence
+- [x] Budget reservation and settlement around order creation
+- [x] Raw-body HMAC-SHA256 webhook verification
+- [x] Provider event-id duplicate handling
+- [x] Authorized/captured/failed state mapping
+- [ ] Live Razorpay Test Mode credential execution
+- [ ] Webhook replay/out-of-order integration tests
+- [ ] Provider reconciliation path
+
 ## Next checkpoint
 
 M15.1 — Live PostgreSQL migration + persistence integration verification.
 
-The risk endpoint now has its first production-control layer. Runtime database execution remains the gate before claiming end-to-end persistence correctness. After that, execute the ML training pipeline, record real held-out metrics, activate the artifact, and then integrate the Razorpay Test Mode payment adapter.
+Payment integration is now structurally implemented but deliberately not marked live/verified. Razorpay documents that webhook signatures use HMAC-SHA256 over the raw request body and that duplicate events can be identified with `x-razorpay-event-id`; order creation uses an integer amount in the smallest currency sub-unit. citeturn909523search0turn909523search2
+
+The remaining gate is runtime verification: execute migrations and integration tests locally, then train and evaluate the real model artifact before enabling production-mode serving.
