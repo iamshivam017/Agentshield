@@ -125,6 +125,6 @@ class ModelProvider:
             self._artifact_model = VerifiedArtifactModel(
                 path=settings.risk_model_artifact_path,
                 expected_sha256=settings.risk_model_artifact_sha256,
-                version=settings.risk_model_version,
+                version=getattr(settings, "risk_model_version", "artifact-unversioned"),
             )
         return self._artifact_model
