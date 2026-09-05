@@ -4,7 +4,7 @@ import hashlib
 import json
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,8 +24,8 @@ def _lock_key(agent_id: str) -> int:
 @router.post("", response_model=PolicyItem, status_code=status.HTTP_201_CREATED)
 async def create_policy(
     request: PolicyCreateRequest,
-    x_operator_api_key: str | None = None,
-    x_operator_id: str | None = None,
+    x_operator_api_key: str | None = Header(default=None),
+    x_operator_id: str | None = Header(default=None),
     session: AsyncSession = Depends(get_session),
 ) -> PolicyItem:
     operator_id = authorize_operator(x_operator_api_key, x_operator_id, {ROLE_ADMIN})
@@ -46,11 +46,7 @@ async def create_policy(
         await session.execute(update(AgentPolicy).where(AgentPolicy.id == latest.id).values(is_active=False))
 
     policy = AgentPolicy(
-        id=uuid4(),
-        agent_id=request.agent_id,
-        version=next_version,
-        is_active=True,
-        rules=request.rules,
+        id=uuid4(), agent_id=request.agent_id, version=next_version, is_active=True, rules=request.rules
     )
     session.add(policy)
     rules_hash = hashlib.sha256(json.dumps(request.rules, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
@@ -67,12 +63,7 @@ async def create_policy(
         raise
     await session.refresh(policy)
     return PolicyItem(
-        id=policy.id,
-        agent_id=policy.agent_id,
-        version=policy.version,
-        is_active=policy.is_active,
-        rules=policy.rules,
-        created_at=policy.created_at,
+        id=policy.id, agent_id=policy.agent_id, version=policy.version, is_active=policy.is_active, rules=policy.rules, created_at=policy.created_at
     )
 
 
