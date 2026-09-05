@@ -57,7 +57,7 @@ async def test_stale_webhook_cannot_regress_captured_payment(monkeypatch: pytest
         )
         session.add(
             ProviderPayment(
-                id=provider_payment_id if False else uuid4(),
+                id=uuid4(),
                 provider_payment_id=provider_payment_id,
                 payment_order_id=payment_order_id,
                 state="PAYMENT_CAPTURED",
