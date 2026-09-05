@@ -47,11 +47,11 @@ from agentshield_api.models import (
     Transaction,
     WebhookEvent,
 )
-from app.payment_contracts import PaymentOrderRequest, PaymentOrderResponse
-from app.razorpay import PaymentProviderError, RazorpayTestProvider, verify_webhook_signature
 from agentshield_api.rate_limit import rate_limiter
 from agentshield_api.risk import PolicyContext, RiskAssessment, classify_score, decide, evaluate_policy
 from agentshield_api.security import authorize_agent
+from app.payment_contracts import PaymentOrderRequest, PaymentOrderResponse
+from app.razorpay import PaymentProviderError, RazorpayTestProvider, verify_webhook_signature
 
 app = FastAPI(title="AgentShield API", version="0.1.0", description="Defense-only AI risk and trust layer for agentic payments.")
 model_provider = ModelProvider(environment=settings.app_env)
@@ -225,6 +225,7 @@ async def evaluate_risk(request: RiskEvaluateRequest, session: AsyncSession = De
     session.add(PolicyEvaluation(id=uuid4(), transaction_id=transaction_id, policy_version=policy.version, result=decision.value, violations=policy_result.violations))
     session.add(RiskDecision(id=uuid4(), transaction_id=transaction_id, decision=decision.value, risk_score=score, risk_band=assessment.band.value, model_version=model.version, policy_version=policy.version, reason_codes=reason_codes))
     session.add(AuditEvent(id=uuid4(), transaction_id=transaction_id, event_type="RISK_DECISION_CREATED", actor_type="AGENT", actor_id=str(agent.id), payload={"decision": decision.value, "risk_score": str(score), "risk_band": assessment.band.value, "model_version": model.version, "policy_version": policy.version, "reason_codes": reason_codes}))
+    await session.flush()
     response = RiskEvaluateResponse(transaction_id=transaction_id, decision=decision.value, risk_score=score, risk_band=assessment.band.value, model_version=model.version, policy_version=policy.version, reason_codes=reason_codes, external_payment_created=False)
     await session.execute(update(IdempotencyRecord).where(IdempotencyRecord.scope == scope, IdempotencyRecord.key == request.idempotency_key).values(response_status=200, response_body=response.model_dump(mode="json")))
     await session.commit()
