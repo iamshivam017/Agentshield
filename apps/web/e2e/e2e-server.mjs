@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { cpSync, existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 
 const transactionId = '11111111-1111-4111-8111-111111111111';
@@ -104,6 +105,12 @@ const apiServer = http.createServer((request, response) => {
 });
 
 let nextServer;
+const copyStaticAssets = () => {
+  if (!existsSync('.next/static')) throw new Error('Next static build assets are missing');
+  cpSync('.next/static', '.next/standalone/.next/static', { recursive: true, force: true });
+  if (existsSync('public')) cpSync('public', '.next/standalone/public', { recursive: true, force: true });
+};
+
 const shutdown = (code = 0) => {
   apiServer.close(() => {
     if (nextServer && !nextServer.killed) nextServer.kill('SIGTERM');
@@ -112,11 +119,17 @@ const shutdown = (code = 0) => {
 };
 
 apiServer.listen(8000, '127.0.0.1', () => {
-  nextServer = spawn('node', ['.next/standalone/server.js'], {
-    stdio: 'inherit',
-    env: { ...process.env, HOSTNAME: '127.0.0.1', PORT: '3000' },
-  });
-  nextServer.on('exit', (code) => shutdown(code ?? 1));
+  try {
+    copyStaticAssets();
+    nextServer = spawn('node', ['.next/standalone/server.js'], {
+      stdio: 'inherit',
+      env: { ...process.env, HOSTNAME: '127.0.0.1', PORT: '3000' },
+    });
+    nextServer.on('exit', (code) => shutdown(code ?? 1));
+  } catch (error) {
+    console.error(error);
+    shutdown(1);
+  }
 });
 
 process.on('SIGINT', () => shutdown());
