@@ -43,11 +43,13 @@
 - [x] Agent budget state for transactional concurrency control
 - [x] Payment order/provider-payment state
 - [x] Webhook event deduplication key
+- [x] Payment-state integrity constraints and terminal-capture guard
 - [x] Audit-event persistence
 - [x] Schema contract tests
 - [x] Alembic migration-chain tests
 - [x] Migration execution against a live PostgreSQL service in CI
 - [x] PostgreSQL integration coverage for transaction/idempotency invariants
+- [x] PostgreSQL integration coverage for terminal payment state
 - [ ] Concurrent multi-request budget stress test
 - [ ] Database backup/restore verification
 
@@ -107,6 +109,8 @@
 ## M18 — Razorpay Test Mode Payment Integration
 
 - [x] Razorpay Test Mode provider adapter
+- [x] Provider protocol abstraction
+- [x] Deterministic mock provider for tests
 - [x] Non-Test-Mode credential rejection
 - [x] Decimal-to-provider-subunit conversion
 - [x] ALLOW-only order creation boundary
@@ -115,10 +119,12 @@
 - [x] Raw-body HMAC-SHA256 webhook verification
 - [x] Provider event-id duplicate handling
 - [x] Authorized/captured/failed state mapping
+- [x] Explicit payment state machine
+- [x] Terminal capture integrity enforced at database layer
+- [x] Out-of-order regression protection for captured payments
 - [ ] Live Razorpay Test Mode credential execution
-- [ ] Webhook replay/out-of-order integration tests
+- [ ] Webhook replay/out-of-order integration tests against webhook endpoint
 - [ ] Provider reconciliation path
-- [ ] Deterministic mock provider in core test suite
 
 ## M19 — Risk Analyst Command Center
 
@@ -173,4 +179,4 @@
 
 ## Next checkpoint
 
-Complete the payment lifecycle hardening (provider abstraction, deterministic mock, replay/out-of-order reconciliation), then build the investigation/evidence pipeline with explicit provenance and a non-authoritative LLM explanation layer. After that, add centralized observability, performance benchmarks, deployment/rollback artifacts, and the five-reviewer production gap audit.
+Complete the payment endpoint replay/out-of-order integration tests and provider reconciliation path, then build the investigation/evidence pipeline with explicit provenance and a non-authoritative LLM explanation layer. After that, add centralized observability, performance benchmarks, deployment/rollback artifacts, and the five-reviewer production gap audit.
