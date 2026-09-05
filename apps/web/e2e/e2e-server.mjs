@@ -3,6 +3,8 @@ import { cpSync, existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 
 const transactionId = '11111111-1111-4111-8111-111111111111';
+const operatorApiKey = process.env.AGENTSHIELD_OPERATOR_API_KEY ?? 'e2e-secret';
+const operatorId = process.env.AGENTSHIELD_OPERATOR_ID ?? 'dashboard-operator';
 const queueItem = {
   transaction_id: transactionId,
   agent_id: '22222222-2222-4222-8222-222222222222',
@@ -77,10 +79,22 @@ const json = (response, body, status = 200) => {
   response.end(JSON.stringify(body));
 };
 
+const requiresOperatorAuth = (path) => path.startsWith('/api/v1/');
+const isAuthorized = (request) => (
+  request.headers['x-operator-api-key'] === operatorApiKey
+  && request.headers['x-operator-id'] === operatorId
+);
+
 const apiServer = http.createServer((request, response) => {
   const url = new URL(request.url ?? '/', 'http://127.0.0.1:8000');
   const path = url.pathname;
+
   if (request.method === 'GET' && path === '/health/ready') return json(response, { status: 'ready' });
+
+  if (requiresOperatorAuth(path) && !isAuthorized(request)) {
+    return json(response, { error: { code: 'UNAUTHORIZED', message: 'operator credentials required' } }, 401);
+  }
+
   if (request.method === 'GET' && path === '/api/v1/risk/metrics') {
     return json(response, { evaluations: 42, high_risk: 3, verification: 7, blocked: 4, allowed: 31 });
   }
@@ -92,7 +106,7 @@ const apiServer = http.createServer((request, response) => {
     return json(response, {
       id: '55555555-5555-4555-8555-555555555555',
       transaction_id: transactionId,
-      reviewer_id: 'dashboard-operator',
+      reviewer_id: operatorId,
       outcome: 'APPROVE',
       note: null,
       created_at: '2026-09-05T10:31:00Z',
@@ -123,7 +137,14 @@ apiServer.listen(8000, '127.0.0.1', () => {
     copyStaticAssets();
     nextServer = spawn('node', ['.next/standalone/server.js'], {
       stdio: 'inherit',
-      env: { ...process.env, HOSTNAME: '127.0.0.1', PORT: '3000' },
+      env: {
+        ...process.env,
+        HOSTNAME: '127.0.0.1',
+        PORT: '3000',
+        AGENTSHIELD_API_URL: 'http://127.0.0.1:8000',
+        AGENTSHIELD_OPERATOR_API_KEY: operatorApiKey,
+        AGENTSHIELD_OPERATOR_ID: operatorId,
+      },
     });
     nextServer.on('exit', (code) => shutdown(code ?? 1));
   } catch (error) {
