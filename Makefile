@@ -1,4 +1,4 @@
-.PHONY: install dev lint format typecheck test test-unit test-integration test-e2e security build db-migrate db-seed ml-all perf-smoke production-check verify verify-all infra-up infra-down
+.PHONY: install dev lint format typecheck test test-unit test-integration test-e2e security build db-migrate db-seed ml-all ml-verify perf-smoke production-check verify verify-all infra-up infra-down
 
 PYTHONPATH := apps/api/src:apps/api
 ML_PYTHONPATH := ml/src
@@ -58,6 +58,9 @@ db-seed:
 
 ml-all:
 	PYTHONPATH=$(ML_PYTHONPATH) python -m agentshield_ml.train
+
+ml-verify:
+	PYTHONPATH=$(ML_PYTHONPATH) python scripts/verify_model_artifact.py artifacts/risk
 
 perf-smoke:
 	PYTHONPATH=$(PYTHONPATH) python scripts/perf_smoke.py
