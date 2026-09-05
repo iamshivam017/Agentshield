@@ -77,22 +77,15 @@ jobs:
         run: |
           rm -rf /tmp/agentshield-model
           PYTHONPATH=ml/src python -m agentshield_ml.train --rows 5000 --seed 42 --output-dir /tmp/agentshield-model
-          PYTHONPATH=ml/src python - <<'PY'
-          import hashlib
-          import json
-          from pathlib import Path
-
-          root = Path("/tmp/agentshield-model")
-          artifact = root / "model.joblib"
-          metadata = json.loads((root / "metadata.json").read_text())
-          digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-          assert metadata["artifact_sha256"] == digest
-          assert metadata["rows"] == 5000
-          assert metadata["selected_candidate"] in {"logistic", "xgboost"}
-          assert metadata["status"] == "EVALUATED"
-          assert set(metadata["frozen_test_metrics"]) >= {"precision", "recall", "f1", "pr_auc", "roc_auc", "fp", "fn"}
-          print(f"validated model artifact: {metadata['model_version']} sha256={digest}")
-          PY
+          PYTHONPATH=ml/src python scripts/verify_model_artifact.py /tmp/agentshield-model
+      - name: Upload verified model smoke artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentshield-risk-model-smoke-${{ github.sha }}
+          path: |
+            /tmp/agentshield-model/model.joblib
+            /tmp/agentshield-model/metadata.json
+          if-no-files-found: error
       - name: Dependency audit
         run: python -m pip_audit -r ml/requirements.txt
 
