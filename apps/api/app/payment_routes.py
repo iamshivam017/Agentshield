@@ -6,11 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agentshield_api.config import settings
 from agentshield_api.db import get_session
 from agentshield_api.models import AuditEvent, PaymentOrder, ProviderPayment, Transaction
-from agentshield_api.payment_state import monotonic_state_update
+from app.payment_state import monotonic_state_update
 from app.razorpay import MockPaymentProvider, PaymentProviderError, RazorpayTestProvider
-from agentshield_api.config import settings
 
 router = APIRouter(prefix="/api/v1/payments", tags=["payments"])
 
@@ -42,7 +42,6 @@ async def reconcile_payment_order(transaction_id: UUID, session: AsyncSession = 
     changed = next_order_state != order.state
     order.state = next_order_state
 
-    provider_payment = None
     if observed.provider_payment_id:
         provider_payment = await session.scalar(
             select(ProviderPayment).where(ProviderPayment.provider_payment_id == observed.provider_payment_id)
@@ -58,10 +57,15 @@ async def reconcile_payment_order(transaction_id: UUID, session: AsyncSession = 
             session.add(provider_payment)
         else:
             provider_payment.payment_order_id = order.id
-            provider_payment.state = monotonic_state_update(provider_payment.state, observed.payment_state or observed.state)
+            provider_payment.state = monotonic_state_update(
+                provider_payment.state,
+                observed.payment_state or observed.state,
+            )
     elif observed.payment_state:
         provider_payment = await session.scalar(
-            select(ProviderPayment).where(ProviderPayment.payment_order_id == order.id).order_by(ProviderPayment.created_at.desc())
+            select(ProviderPayment)
+            .where(ProviderPayment.payment_order_id == order.id)
+            .order_by(ProviderPayment.created_at.desc())
         )
         if provider_payment is not None:
             provider_payment.state = monotonic_state_update(provider_payment.state, observed.payment_state)
