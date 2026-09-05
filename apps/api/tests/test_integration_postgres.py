@@ -61,6 +61,11 @@ async def test_risk_evaluate_persists_and_replays_idempotently() -> None:
         assert second.status_code == 200
         assert second.json() == first_body
 
+        conflicting = {**payload, "amount": "126.00"}
+        conflict = await client.post("/api/v1/risk/evaluate", json=conflicting)
+        assert conflict.status_code == 409
+        assert conflict.json()["error"]["code"] == "IDEMPOTENCY_KEY_CONFLICT"
+
         detail = await client.get(f"/api/v1/risk/transactions/{first_body['transaction_id']}")
         assert detail.status_code == 200
         assert detail.json()["transaction"]["transaction_id"] == first_body["transaction_id"]
