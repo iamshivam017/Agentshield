@@ -92,4 +92,6 @@ async def create_policy(
 
 def register_policy_routes(app) -> None:
     app.include_router(router)
+    from app.payment_routes import router as payment_router
+    app.include_router(payment_router)
     install_control_plane_security(app)
