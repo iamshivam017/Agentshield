@@ -20,22 +20,27 @@ export default function ControlPlane({ section }: Props) {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError(null);
-    const load = async () => {
-      try {
-        if (section === 'Policies') setPolicies(await getPolicies());
-        if (section === 'Models') setModels(await getModels());
-        if (section === 'Audit') setAudit(await getAudit(100));
-        if (section === 'System Health') setHealth(await getHealth());
-      } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : 'Unable to load control-plane data');
-      } finally {
-        if (active) setLoading(false);
-      }
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      setError(null);
+      const load = async () => {
+        try {
+          if (section === 'Policies') setPolicies(await getPolicies());
+          if (section === 'Models') setModels(await getModels());
+          if (section === 'Audit') setAudit(await getAudit(100));
+          if (section === 'System Health') setHealth(await getHealth());
+        } catch (err) {
+          if (active) setError(err instanceof Error ? err.message : 'Unable to load control-plane data');
+        } finally {
+          if (active) setLoading(false);
+        }
+      };
+      void load();
+    }, 0);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
     };
-    void load();
-    return () => { active = false; };
   }, [section]);
 
   if (loading) return <div className="panel loading-panel">Loading {section.toLowerCase()}…</div>;
