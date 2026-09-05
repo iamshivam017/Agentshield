@@ -46,8 +46,8 @@
 - [x] Audit-event persistence
 - [x] Schema contract tests
 - [x] Alembic migration-chain tests
-- [ ] Migration execution against a live local database
-- [ ] Integration tests for transactions/concurrency/idempotency
+- [x] Migration execution against a live PostgreSQL service in CI
+- [ ] Integration tests for transactions/concurrency/idempotency against PostgreSQL
 - [ ] Database backup/restore verification
 
 ## M16 — Synthetic Dataset + Risk Model
@@ -136,8 +136,25 @@
 - [ ] Accessibility automated audit
 - [ ] Browser E2E tests
 
+## CI verification
+
+- [x] API lint
+- [x] API type-check
+- [x] API unit/security tests
+- [x] API dependency audit
+- [x] Web lint
+- [x] Web type-check
+- [x] Web production build
+- [x] Web dependency audit
+- [x] ML tests/compile
+- [x] ML dependency audit
+- [x] API + web container builds
+- [x] Live PostgreSQL migration check
+- [ ] End-to-end browser test execution in CI
+- [ ] Runtime ML training smoke execution in CI
+
 ## Next checkpoint
 
-M15.1 — Live PostgreSQL migration + persistence integration verification, then M16 runtime training execution and M17 trained-model serving integration/API integration tests.
+Complete and verify the runtime ML training smoke, then integrate a checksum-verified trained artifact into the production API serving path. In parallel, add PostgreSQL-backed API integration coverage for transaction persistence, idempotency, concurrency/budget reservation, and the remaining M19 control-plane screens.
 
-The ML layer now has an executable model-comparison pipeline using the reproducible synthetic stream, chronological validation/test separation, cost-aware thresholding, calibration diagnostics, and artifact SHA-256 metadata. Actual runtime metric capture is intentionally still marked pending until it is executed in a verified environment.
+The repository has now passed API/web/ML static checks, dependency audits, and container builds in GitHub Actions. The live migration gate is also part of CI and has passed in the observed run; runtime ML training remains pending until its new smoke step completes successfully.
