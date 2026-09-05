@@ -65,7 +65,15 @@ async def _seed_captured_payment() -> tuple:
     return agent_id, merchant_id, transaction_id, payment_order_id, provider_payment_id, provider_order_id
 
 
-async def _delete_seed(agent_id, merchant_id, transaction_id, payment_order_id, provider_payment_id) -> None:
+async def _delete_seed(
+    agent_id,
+    merchant_id,
+    transaction_id,
+    payment_order_id,
+    provider_payment_id,
+    provider_order_id,
+) -> None:
+    del provider_order_id
     async with SessionLocal() as session:
         await session.execute(delete(ProviderPayment).where(ProviderPayment.provider_payment_id == provider_payment_id))
         await session.execute(delete(PaymentOrder).where(PaymentOrder.id == payment_order_id))
