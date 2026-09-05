@@ -44,12 +44,14 @@
 - [x] Payment order/provider-payment state
 - [x] Webhook event deduplication key
 - [x] Audit-event persistence
+- [x] Schema contract tests
+- [x] Alembic migration-chain tests
 - [ ] Migration execution against a live local database
 - [ ] Integration tests for transactions/concurrency/idempotency
 - [ ] Database backup/restore verification
 
 ## Next checkpoint
 
-M15.1 — Migration verification + persistence integration tests.
+M15.1 — Migration execution + persistence integration tests.
 
-The schema and ORM foundations are now committed. Before ML work begins, migrations must be executed against the local PostgreSQL service and persistence behavior must be verified under expected, invalid, failure, idempotency, and concurrency cases.
+The schema and ORM foundations are committed, and static migration/schema contract coverage is in place. Runtime verification still requires executing Alembic against PostgreSQL and exercising transaction, concurrency, idempotency, and failure behavior.
