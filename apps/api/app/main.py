@@ -172,12 +172,16 @@ def live() -> dict[str, str]:
 
 
 @app.get("/health/ready", tags=["health"])
-def ready() -> dict[str, str]:
+async def ready(session: AsyncSession = Depends(get_session)) -> tuple[dict[str, str], int]:
+    try:
+        await session.execute(text("SELECT 1"))
+    except Exception:
+        return {"status": "unavailable", "reason": "database_unavailable"}, 503
     try:
         model_provider.get_active()
     except ModelUnavailable:
-        return {"status": "degraded", "reason": "risk_model_unavailable"}
-    return {"status": "ready"}
+        return {"status": "degraded", "reason": "risk_model_unavailable"}, 200
+    return {"status": "ready"}, 200
 
 
 @app.get("/api/v1", tags=["system"])
