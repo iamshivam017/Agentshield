@@ -90,6 +90,10 @@
 - [x] Security response headers
 - [x] Bounded in-process rate limiting
 - [x] Unit coverage for security-control invariants
+- [x] Read-only risk queue/detail APIs
+- [x] Human review endpoint with audit event
+- [x] Policy/model/audit read APIs
+- [x] Risk metrics API
 - [ ] Runtime API integration tests against PostgreSQL
 - [ ] Redis-backed distributed rate limiting
 - [ ] Trained model artifact integration
@@ -118,17 +122,20 @@
 - [x] Track 02 and Test Mode safety boundary in UI
 - [x] Responsive layout foundations
 - [x] Keyboard-focusable navigation controls
-- [ ] Real API data wiring
-- [ ] Investigation workspace
+- [x] Real API data wiring for risk metrics and queue
+- [x] Transaction investigation workspace
+- [x] Human review actions from investigation workspace
+- [x] Real audit trail rendering
+- [x] API proxy configuration for local web/API split
 - [ ] Policy management UI
 - [ ] Model evaluation UI
-- [ ] Audit explorer
+- [ ] Audit explorer page
 - [ ] System health detail page
 - [ ] Accessibility automated audit
 - [ ] Browser E2E tests
 
 ## Next checkpoint
 
-M15.1 — Live PostgreSQL migration + persistence integration verification, while M19 continues through real API wiring.
+M15.1 — Live PostgreSQL migration + persistence integration verification, then M16 runtime model training/validation and M17 runtime API integration tests.
 
-The first polished Risk Analyst Command Center experience is now committed. It intentionally uses clearly labeled sandbox/demo values until backend endpoints are wired; it does not present demo statistics as measured production metrics.
+The Command Center now consumes the risk metrics, paginated queue, transaction detail, review, and audit APIs instead of presenting hardcoded production-looking statistics. The remaining UI areas are intentionally still marked as not implemented until their corresponding backend workflows and verification coverage exist.
