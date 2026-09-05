@@ -14,6 +14,7 @@ from agentshield_api.security import (
     ROLE_ADMIN,
     ROLE_ANALYST,
     ROLE_VIEWER,
+    _required_roles,
     authorize_agent,
     authorize_operator,
     require_operator,
@@ -125,3 +126,10 @@ def test_operator_role_cannot_be_selected_by_header(monkeypatch) -> None:
     principal = require_operator("admin-secret", "viewer-supplied")
     assert principal.role == ROLE_ADMIN
     assert principal.operator_id == "viewer-supplied"
+
+
+def test_sensitive_control_plane_mutations_are_least_privilege() -> None:
+    assert _required_roles("/api/v1/risk/transactions/123/investigation", "POST") == {ROLE_ANALYST, ROLE_ADMIN}
+    assert _required_roles("/api/v1/payments/orders/123/reconcile", "POST") == {ROLE_ANALYST, ROLE_ADMIN}
+    assert _required_roles("/api/v1/models/baseline/activate", "POST") == {ROLE_ADMIN}
+    assert _required_roles("/api/v1/risk/transactions/123/investigation", "GET") == {ROLE_VIEWER, ROLE_ANALYST, ROLE_ADMIN}
