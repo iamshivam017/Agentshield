@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import hashlib
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agentshield_api.config import settings
 from agentshield_api.db import get_session
 from agentshield_api.models import AuditEvent, ModelVersion
 from agentshield_api.security import ROLE_ADMIN, authorize_operator
@@ -27,6 +30,33 @@ def _validate_transition(current: str, target: str) -> None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"invalid_model_transition:{current}->{target}")
 
 
+def _artifact_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _verify_active_serving_contract(model: ModelVersion) -> None:
+    if settings.app_env not in {"staging", "production"}:
+        return
+    configured_version = settings.risk_model_version
+    configured_hash = settings.risk_model_artifact_sha256
+    configured_path = settings.risk_model_artifact_path
+    if configured_version != model.version:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="serving_model_version_mismatch")
+    if not configured_hash or configured_hash != model.artifact_sha256:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="serving_model_checksum_mismatch")
+    if not configured_path:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="serving_model_artifact_path_missing")
+    artifact_path = Path(configured_path)
+    if not artifact_path.is_file():
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="serving_model_artifact_unavailable")
+    if _artifact_sha256(artifact_path) != model.artifact_sha256:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="serving_model_artifact_tampered")
+
+
 async def _transition(version: str, target: str, *, operator_id: str | None, session: AsyncSession) -> ModelVersion:
     model = await session.scalar(select(ModelVersion).where(ModelVersion.version == version).with_for_update())
     if model is None:
@@ -35,6 +65,7 @@ async def _transition(version: str, target: str, *, operator_id: str | None, ses
     _validate_transition(model.status, target)
 
     if target == "ACTIVE":
+        _verify_active_serving_contract(model)
         await session.execute(text("SELECT pg_advisory_xact_lock(hashtextextended('model-active', 0))"))
         await session.execute(
             update(ModelVersion)
