@@ -5,7 +5,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, Protocol
 
-import joblib
+import joblib  # type: ignore[import-untyped]
 import numpy as np
 
 from .config import settings
