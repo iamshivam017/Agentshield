@@ -153,7 +153,7 @@
 - [x] Policy/model/audit/system-health control-plane screens
 - [x] Browser E2E suite in CI
 - [ ] Authenticated control-plane browser flow
-- [ ] Accessibility automated audit
+- [x] Accessibility automated audit
 
 ## M20 — Investigation, AI Safety & Observability
 
@@ -210,9 +210,10 @@
 - [x] API + web container builds
 - [x] Live PostgreSQL migration check through current migration chain
 - [x] Browser E2E execution in CI
+- [x] Automated accessibility audit
 - [x] Runtime ML training smoke execution in CI
 - [x] Trained smoke artifact checksum verification in API CI
 
 ## Next checkpoint
 
-Verify the current CI suite after the model-governance and concurrency additions. Then complete final artifact promotion, deployment/IaC/rollback, backup/restore, authenticated browser coverage, accessibility audit, target-environment performance execution, and the five-reviewer production gap audit.
+Verify the new backup/restore smoke command and current CI suite. Then complete final artifact promotion, authenticated browser coverage, live Test Mode payment verification, target-environment performance execution, deployment/IaC/rollback, and the five-reviewer production gap audit.
