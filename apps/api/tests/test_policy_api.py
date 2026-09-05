@@ -27,34 +27,21 @@ def policy_rules(limit: str = "1000.00") -> dict[str, object]:
 @pytest.mark.integration
 async def test_policy_rotation_is_authorized_versioned_and_audited(monkeypatch: pytest.MonkeyPatch) -> None:
     agent_id = uuid4()
-    original_require = settings.require_operator_auth
-    original_key = settings.operator_api_key
     monkeypatch.setattr(settings, "require_operator_auth", True)
     monkeypatch.setattr(settings, "operator_api_key", "operator-test-key")
 
     async with SessionLocal() as session:
         session.add(Agent(id=agent_id, name="Policy Agent", status="ACTIVE"))
-        session.add(
-            AgentPolicy(
-                id=uuid4(),
-                agent_id=agent_id,
-                version=1,
-                is_active=True,
-                rules=policy_rules(),
-            )
-        )
+        session.add(AgentPolicy(id=uuid4(), agent_id=agent_id, version=1, is_active=True, rules=policy_rules()))
         await session.commit()
 
     payload = {"agent_id": str(agent_id), "rules": policy_rules("1500.00")}
+    operator_headers = {"X-Operator-API-Key": "operator-test-key", "X-Operator-ID": "risk-admin"}
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
         unauthorized = await client.post("/api/v1/policies", json=payload)
         assert unauthorized.status_code == 401
 
-        created = await client.post(
-            "/api/v1/policies",
-            json=payload,
-            headers={"X-Operator-API-Key": "operator-test-key", "X-Operator-ID": "risk-admin"},
-        )
+        created = await client.post("/api/v1/policies", json=payload, headers=operator_headers)
         assert created.status_code == 201
         created_body = created.json()
         assert created_body["version"] == 2
@@ -62,7 +49,7 @@ async def test_policy_rotation_is_authorized_versioned_and_audited(monkeypatch: 
         assert created_body["rules"]["transaction_limit"] == "1500.00"
         assert created_body["rules"]["allowed_categories"] == ["SOFTWARE", "ELECTRONICS"]
 
-        policies = await client.get(f"/api/v1/policies?agent_id={agent_id}")
+        policies = await client.get(f"/api/v1/policies?agent_id={agent_id}", headers=operator_headers)
         assert policies.status_code == 200
         versions = {item["version"]: item for item in policies.json()}
         assert versions[1]["is_active"] is False
@@ -71,10 +58,9 @@ async def test_policy_rotation_is_authorized_versioned_and_audited(monkeypatch: 
 
     async with SessionLocal() as session:
         audit = await session.scalar(
-            select(AuditEvent).where(
-                AuditEvent.event_type == "POLICY_VERSION_CREATED",
-                AuditEvent.actor_id == "risk-admin",
-            ).order_by(AuditEvent.occurred_at.desc())
+            select(AuditEvent)
+            .where(AuditEvent.event_type == "POLICY_VERSION_CREATED", AuditEvent.actor_id == "risk-admin")
+            .order_by(AuditEvent.occurred_at.desc())
         )
         assert audit is not None
         assert audit.payload["version"] == 2
@@ -85,9 +71,6 @@ async def test_policy_rotation_is_authorized_versioned_and_audited(monkeypatch: 
         await session.execute(delete(AgentPolicy).where(AgentPolicy.agent_id == agent_id))
         await session.execute(delete(Agent).where(Agent.id == agent_id))
         await session.commit()
-
-    monkeypatch.setattr(settings, "require_operator_auth", original_require)
-    monkeypatch.setattr(settings, "operator_api_key", original_key)
 
 
 async def test_policy_contract_rejects_unknown_and_incomplete_rules() -> None:
