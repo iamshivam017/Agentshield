@@ -121,26 +121,31 @@ class PolicyCreateRequest(BaseModel):
                 raise ValueError(f"invalid_policy_rule:{key}")
             if key != "verification_threshold" and value.as_tuple().exponent < -2:
                 raise ValueError(f"invalid_policy_rule:{key}")
+            if key == "verification_threshold" and value > Decimal("1"):
+                raise ValueError(f"invalid_policy_rule:{key}")
             normalized[key] = str(value.quantize(Decimal("0.01") if key != "verification_threshold" else Decimal("0.000001")))
 
         transaction_limit = Decimal(normalized["transaction_limit"])
         daily_limit = Decimal(normalized["daily_limit"])
-        threshold = Decimal(normalized["verification_threshold"])
         if daily_limit < transaction_limit:
             raise ValueError("daily_limit_must_cover_transaction_limit")
-        if threshold > Decimal("1"):
-            raise ValueError("verification_threshold_out_of_range")
 
-        categories = self.rules.get("allowed_categories", [])
-        if categories is None:
-            categories = []
-        if not isinstance(categories, list) or len(categories) > 100:
+        raw_categories = self.rules.get("allowed_categories", [])
+        if raw_categories is None:
+            categories: list[object] = []
+        elif not isinstance(raw_categories, list) or len(raw_categories) > 100:
             raise ValueError("invalid_allowed_categories")
+        else:
+            categories = raw_categories
+
         normalized_categories: list[str] = []
         for category in categories:
-            if not isinstance(category, str) or not 1 <= len(category.strip()) <= 80:
+            if not isinstance(category, str):
                 raise ValueError("invalid_allowed_categories")
-            normalized_categories.append(category.strip().upper())
+            cleaned = category.strip()
+            if not 1 <= len(cleaned) <= 80:
+                raise ValueError("invalid_allowed_categories")
+            normalized_categories.append(cleaned.upper())
         normalized["allowed_categories"] = list(dict.fromkeys(normalized_categories))
         self.rules = normalized
         return self
