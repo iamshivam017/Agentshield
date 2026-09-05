@@ -143,6 +143,7 @@ class TransactionDetailResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     transaction: RiskQueueItem
+    features: dict | None
     prediction: dict | None
     policy_evaluation: dict | None
     decision_record: dict | None
