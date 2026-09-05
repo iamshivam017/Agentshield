@@ -70,6 +70,8 @@ async def test_risk_evaluate_persists_and_replays_idempotently() -> None:
         assert detail.status_code == 200
         assert detail.json()["transaction"]["transaction_id"] == first_body["transaction_id"]
         assert detail.json()["decision_record"]["model_version"] == first_body["model_version"]
+        assert detail.json()["features"]["version"] == "v1"
+        assert detail.json()["features"]["values"]["amount"] == 125.0
 
         metrics = await client.get("/api/v1/risk/metrics")
         assert metrics.status_code == 200
@@ -89,6 +91,8 @@ async def test_risk_evaluate_persists_and_replays_idempotently() -> None:
         assert feature.values["amount"] == 125.0
         assert feature.values["agent_tx_count_prior"] == 0.0
         assert feature.values["device_tx_count_prior"] == 0.0
+
+        await session.execute(delete(Transaction).where(Transaction.id == transaction.id))
         await session.execute(delete(Agent).where(Agent.id == agent_id))
         await session.execute(delete(Merchant).where(Merchant.id == merchant_id))
         await session.commit()
