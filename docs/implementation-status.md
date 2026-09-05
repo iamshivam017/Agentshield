@@ -61,10 +61,12 @@
 - [x] Validation threshold selection with FP/FN costs
 - [x] Model metadata/version/seed capture
 - [x] Automated ML unit tests
-- [ ] Runtime model training and measured validation/test metrics
-- [ ] Candidate XGBoost comparison
-- [ ] Calibration analysis
-- [ ] Model artifact SHA-256 registry record
+- [x] Runtime training pipeline implementation for measured validation/test metrics
+- [x] Candidate XGBoost comparison implementation
+- [x] Calibration analysis implementation (Brier + ECE)
+- [x] Artifact SHA-256 checksum generation and registry metadata
+- [ ] Runtime training execution with measured metrics captured from this environment
+- [ ] Approved/ACTIVE artifact loaded by API serving path
 
 ## M17 — Risk Decision API
 
@@ -136,6 +138,6 @@
 
 ## Next checkpoint
 
-M15.1 — Live PostgreSQL migration + persistence integration verification, then M16 runtime model training/validation and M17 runtime API integration tests.
+M15.1 — Live PostgreSQL migration + persistence integration verification, then M16 runtime training execution and M17 trained-model serving integration/API integration tests.
 
-The Command Center now consumes the risk metrics, paginated queue, transaction detail, review, and audit APIs instead of presenting hardcoded production-looking statistics. CI is now defined for API lint/type/test/security, web lint/type/build/security, and container builds; actual workflow success remains a runtime verification step rather than an assumed result.
+The ML layer now has an executable model-comparison pipeline using the reproducible synthetic stream, chronological validation/test separation, cost-aware thresholding, calibration diagnostics, and artifact SHA-256 metadata. Actual runtime metric capture is intentionally still marked pending until it is executed in a verified environment.
