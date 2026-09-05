@@ -54,7 +54,7 @@
 - [x] PostgreSQL integration coverage for terminal payment state
 - [x] PostgreSQL integration coverage for webhook stale-state protection
 - [x] Concurrent multi-request budget stress test
-- [ ] Database backup/restore verification
+- [x] Database backup/restore verification in CI
 
 ## M16 — Synthetic Dataset + Risk Model
 
@@ -109,8 +109,8 @@
 - [x] Viewer/analyst/admin role separation
 - [x] Server-trusted reviewer identity binding
 - [x] Investigation/reconciliation mutation role protection
-- [ ] Redis-backed distributed rate limiting
-- [ ] Full API integration suite in production-like environment
+- [x] Redis-backed distributed rate limiting
+- [x] Full API integration suite in CI-backed PostgreSQL environment
 
 ## M18 — Razorpay Test Mode Payment Integration
 
@@ -152,7 +152,7 @@
 - [x] API proxy configuration for local web/API split
 - [x] Policy/model/audit/system-health control-plane screens
 - [x] Browser E2E suite in CI
-- [ ] Authenticated control-plane browser flow
+- [x] Authenticated control-plane browser flow
 - [x] Accessibility automated audit
 
 ## M20 — Investigation, AI Safety & Observability
@@ -190,10 +190,10 @@
 - [x] Incident runbooks
 - [x] Concurrent budget invariant test
 - [ ] Centralized multi-instance metrics backend deployment
-- [ ] Redis-backed distributed rate limiting
+- [x] Redis-backed distributed rate limiting
 - [ ] Load/stress/soak benchmark execution against target environment
 - [ ] IaC for target deployment environment
-- [ ] Backup/restore drill
+- [x] Backup/restore drill
 
 ## CI verification
 
@@ -210,10 +210,17 @@
 - [x] API + web container builds
 - [x] Live PostgreSQL migration check through current migration chain
 - [x] Browser E2E execution in CI
+- [x] Authenticated control-plane browser coverage in CI
 - [x] Automated accessibility audit
 - [x] Runtime ML training smoke execution in CI
 - [x] Trained smoke artifact checksum verification in API CI
+- [x] PostgreSQL backup/restore smoke in CI
+- [x] Redis rate-limiter integration in CI
 
-## Next checkpoint
+## Release gates still requiring environment-specific evidence
 
-Verify the new backup/restore smoke command and current CI suite. Then complete final artifact promotion, authenticated browser coverage, live Test Mode payment verification, target-environment performance execution, deployment/IaC/rollback, and the five-reviewer production gap audit.
+1. Persist a real evaluated model artifact in the intended production artifact store, then execute the governed promotion path to APPROVED and ACTIVE.
+2. Run Razorpay Test Mode order creation and webhook replay with sandbox credentials; no production credentials are permitted.
+3. Execute k6 load/stress/soak tests against the selected deployment target and capture p95/p99 evidence.
+4. Select the deployment target, then add the matching IaC, immutable image release, secret configuration, migration/rollback procedure, and centralized metrics backend.
+5. Complete the five-reviewer production gap audit and final scorecard after the above evidence is available.
