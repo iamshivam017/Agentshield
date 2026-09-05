@@ -1,8 +1,10 @@
 .PHONY: install dev lint format typecheck test test-unit test-integration test-e2e security build db-migrate db-seed ml-all perf-smoke production-check verify verify-all infra-up infra-down
 
+PYTHONPATH := apps/api/src:apps/api
+
 install:
 	python -m pip install -r apps/api/requirements.txt
-	cd apps/web && npm install
+	cd apps/web && npm ci
 
 dev:
 	docker compose up -d
@@ -14,50 +16,50 @@ infra-down:
 	docker compose down
 
 lint:
-	python -m ruff check apps/api
+	PYTHONPATH=$(PYTHONPATH) python -m ruff check apps/api
 	cd apps/web && npm run lint
 
 format:
-	python -m ruff format apps/api
+	PYTHONPATH=$(PYTHONPATH) python -m ruff format apps/api
 	cd apps/web && npm run format
 
 typecheck:
-	python -m mypy apps/api/app
+	PYTHONPATH=$(PYTHONPATH) python -m mypy apps/api/app apps/api/src
 	cd apps/web && npm run typecheck
 
 test:
-	pytest -q
+	PYTHONPATH=$(PYTHONPATH) pytest -q
 
 test-unit:
-	pytest -q apps/api/tests/unit
+	PYTHONPATH=$(PYTHONPATH) pytest -q apps/api/tests/unit
 
 test-integration:
-	pytest -q apps/api/tests/integration
+	PYTHONPATH=$(PYTHONPATH) pytest -q apps/api/tests/integration
 
 test-e2e:
 	cd apps/web && npm run test:e2e
 
 security:
-	python -m pip_audit -r apps/api/requirements.txt
+	PYTHONPATH=$(PYTHONPATH) python -m pip_audit -r apps/api/requirements.txt
 	cd apps/web && npm audit --audit-level=high
 
 build:
 	cd apps/web && npm run build
 
 db-migrate:
-	cd apps/api && alembic upgrade head
+	cd apps/api && PYTHONPATH=src:app alembic upgrade head
 
 db-seed:
-	python scripts/seed.py
+	PYTHONPATH=$(PYTHONPATH) python scripts/seed.py
 
 ml-all:
-	python scripts/ml_pipeline.py
+	PYTHONPATH=$(PYTHONPATH) python scripts/ml_pipeline.py
 
 perf-smoke:
-	python scripts/perf_smoke.py
+	PYTHONPATH=$(PYTHONPATH) python scripts/perf_smoke.py
 
 production-check:
-	python scripts/production_check.py
+	PYTHONPATH=$(PYTHONPATH) python scripts/production_check.py
 
 verify: lint typecheck test build
 verify-all: verify security
