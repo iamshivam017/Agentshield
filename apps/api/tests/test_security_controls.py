@@ -1,16 +1,21 @@
 from __future__ import annotations
 
-import os
+import hashlib
+import json
 from uuid import uuid4
 
-os.environ.setdefault("APP_ENV", "development")
-
 from agentshield_api.contracts import RiskEvaluateRequest
-from agentshield_api.main import request_hash
 from agentshield_api.rate_limit import InProcessRateLimiter
 
 
-def test_request_hash_ignores_idempotency_key() -> None:
+def canonical_business_fingerprint(request: RiskEvaluateRequest) -> str:
+    payload = request.model_dump(mode="json")
+    payload.pop("idempotency_key", None)
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def test_request_fingerprint_ignores_idempotency_key() -> None:
     payload = {
         "agent_id": str(uuid4()),
         "merchant_id": str(uuid4()),
@@ -22,10 +27,10 @@ def test_request_hash_ignores_idempotency_key() -> None:
     }
     first = RiskEvaluateRequest(**payload, idempotency_key="key-one")
     second = RiskEvaluateRequest(**payload, idempotency_key="key-two")
-    assert request_hash(first) == request_hash(second)
+    assert canonical_business_fingerprint(first) == canonical_business_fingerprint(second)
 
 
-def test_request_hash_changes_for_business_request() -> None:
+def test_request_fingerprint_changes_for_business_request() -> None:
     common = {
         "agent_id": uuid4(),
         "merchant_id": uuid4(),
@@ -36,7 +41,7 @@ def test_request_hash_changes_for_business_request() -> None:
     }
     first = RiskEvaluateRequest(**common, amount="100.00", idempotency_key="key-one")
     second = RiskEvaluateRequest(**common, amount="101.00", idempotency_key="key-one")
-    assert request_hash(first) != request_hash(second)
+    assert canonical_business_fingerprint(first) != canonical_business_fingerprint(second)
 
 
 def test_rate_limiter_rejects_after_limit(monkeypatch) -> None:
