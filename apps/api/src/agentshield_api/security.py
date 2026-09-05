@@ -8,6 +8,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from fastapi.responses import JSONResponse
+from sqlalchemy import select
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
