@@ -67,7 +67,10 @@ export default function Page() {
   };
 
   useEffect(() => {
-    void refresh();
+    const timer = window.setTimeout(() => {
+      void refresh();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const headline = useMemo(() => {
