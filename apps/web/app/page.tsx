@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import ControlPlane from './control-plane';
 import {
   createReview,
   getRiskMetrics,
@@ -22,6 +23,8 @@ const nav = [
   ['Audit', ''],
   ['System Health', ''],
 ] as const;
+
+const controlPlaneSections = new Set(['Policies', 'Models', 'Audit', 'System Health']);
 
 const scenarios = [
   { name: 'Safe purchase', decision: 'ALLOW', score: 'low', detail: 'Known device · normal velocity' },
@@ -104,6 +107,8 @@ export default function Page() {
     }
   };
 
+  const isControlPlane = controlPlaneSections.has(active);
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -129,7 +134,9 @@ export default function Page() {
 
         {error && <div className="error-banner" role="alert"><strong>Data unavailable.</strong> {error}</div>}
 
-        {active === 'Investigations' && selected ? (
+        {isControlPlane ? (
+          <ControlPlane section={active as 'Policies' | 'Models' | 'Audit' | 'System Health'} />
+        ) : active === 'Investigations' && selected ? (
           <InvestigationView detail={selected} busy={reviewing} onReview={submitReview} />
         ) : (
           <>
