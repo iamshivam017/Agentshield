@@ -13,6 +13,8 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from .config import settings
+from .db import SessionLocal
+from .models import Transaction
 
 
 @dataclass(frozen=True)
@@ -45,6 +47,30 @@ def authorize_agent(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_agent_credentials")
     if x_agent_id is None or x_agent_id != agent_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="agent_identity_mismatch")
+
+
+async def authorize_payment_order_request(request: Request) -> None:
+    """Authenticate a payment-order caller and bind it to the transaction's agent."""
+    if settings.app_env.lower() not in {"production", "staging"} and not settings.require_agent_auth:
+        return
+
+    try:
+        payload = json.loads(await request.body())
+        transaction_id = UUID(str(payload.get("transaction_id")))
+    except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid_payment_order_payload")
+
+    supplied_agent_id = request.headers.get("X-Agent-ID")
+    try:
+        x_agent_id = UUID(supplied_agent_id) if supplied_agent_id else None
+    except ValueError:
+        x_agent_id = None
+
+    async with SessionLocal() as session:
+        transaction = await session.scalar(select(Transaction).where(Transaction.id == transaction_id))
+    if transaction is None:
+        return
+    authorize_agent(transaction.agent_id, request.headers.get("X-Agent-API-Key"), x_agent_id)
 
 
 def _operator_credentials() -> tuple[tuple[str, str], ...]:
@@ -144,6 +170,12 @@ def _auth_error_response(request: Request, exc: HTTPException) -> JSONResponse:
 
 class ControlPlaneAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        if request.url.path == "/api/v1/payments/orders" and request.method == "POST":
+            try:
+                await authorize_payment_order_request(request)
+            except HTTPException as exc:
+                return _auth_error_response(request, exc)
+
         allowed_roles = _required_roles(request.url.path, request.method)
         if allowed_roles is not None:
             try:
