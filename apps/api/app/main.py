@@ -28,6 +28,7 @@ from agentshield_api.contracts import (
 )
 from agentshield_api.db import get_session
 from agentshield_api.errors import error_payload, install_error_handlers
+from agentshield_api.features import FEATURE_VERSION, build_point_in_time_features
 from agentshield_api.model_provider import ModelProvider, ModelUnavailable
 from agentshield_api.models import (
     Agent,
@@ -45,6 +46,7 @@ from agentshield_api.models import (
     RiskDecision,
     RiskPrediction,
     Transaction,
+    TransactionFeature,
     WebhookEvent,
 )
 from agentshield_api.rate_limit import rate_limiter
@@ -201,30 +203,44 @@ async def evaluate_risk(request: RiskEvaluateRequest, session: AsyncSession = De
     policy = await session.scalar(select(AgentPolicy).where(AgentPolicy.agent_id == agent.id, AgentPolicy.is_active.is_(True)).order_by(AgentPolicy.version.desc()))
     if policy is None:
         raise HTTPException(status_code=409, detail="active_policy_not_configured")
+
+    occurred_at = (request.occurred_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
     try:
+        features = await build_point_in_time_features(
+            session,
+            agent_id=agent.id,
+            merchant_id=merchant.id,
+            device_id=request.device_id,
+            occurred_at=occurred_at,
+            amount=request.amount,
+        )
         model = model_provider.get_active()
+        score, model_signals = model.predict(features=features, category=request.category)
     except ModelUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    score, model_signals = model.predict(amount=request.amount, category=request.category)
     assessment = RiskAssessment(score=score, band=classify_score(score), model_version=model.version, signals=model_signals)
     rules = policy.rules or {}
     transaction_limit = Decimal(str(rules.get("transaction_limit", settings.transaction_limit_default)))
     daily_limit = Decimal(str(rules.get("daily_limit", settings.daily_limit_default)))
     verification_threshold = Decimal(str(rules.get("verification_threshold", settings.verification_threshold)))
     allowed_categories = {str(v).upper() for v in rules.get("allowed_categories", [])}
-    period_key = (request.occurred_at or datetime.now(timezone.utc)).astimezone(timezone.utc).date().isoformat()
+    period_key = occurred_at.date().isoformat()
     budget_state = await session.scalar(select(AgentBudgetState).where(AgentBudgetState.agent_id == agent.id, AgentBudgetState.period_key == period_key))
     daily_spent = Decimal("0") if budget_state is None else budget_state.spent + budget_state.reserved
     policy_result = evaluate_policy(PolicyContext(agent_active=agent.status == "ACTIVE", amount=request.amount, transaction_limit=transaction_limit, daily_spent=daily_spent, daily_limit=daily_limit, verification_threshold=verification_threshold, category_allowed=not allowed_categories or request.category.upper() in allowed_categories), policy.version)
     decision = decide(assessment, policy_result, verification_threshold)
     transaction_id = uuid4()
     reason_codes = list(dict.fromkeys(policy_result.violations + model_signals))
-    session.add(Transaction(id=transaction_id, agent_id=agent.id, merchant_id=merchant.id, amount=request.amount, currency=request.currency, device_id=request.device_id, occurred_at=request.occurred_at, status="EVALUATED"))
+
+    transaction = Transaction(id=transaction_id, agent_id=agent.id, merchant_id=merchant.id, amount=request.amount, currency=request.currency, device_id=request.device_id, occurred_at=occurred_at, status="EVALUATED")
+    session.add(transaction)
+    await session.flush()
+    session.add(TransactionFeature(id=uuid4(), transaction_id=transaction_id, feature_version=FEATURE_VERSION, values=features))
     session.add(RiskPrediction(id=uuid4(), transaction_id=transaction_id, model_version=model.version, score=score, risk_band=assessment.band.value, signals={"signals": model_signals}))
     session.add(PolicyEvaluation(id=uuid4(), transaction_id=transaction_id, policy_version=policy.version, result=decision.value, violations=policy_result.violations))
     session.add(RiskDecision(id=uuid4(), transaction_id=transaction_id, decision=decision.value, risk_score=score, risk_band=assessment.band.value, model_version=model.version, policy_version=policy.version, reason_codes=reason_codes))
-    session.add(AuditEvent(id=uuid4(), transaction_id=transaction_id, event_type="RISK_DECISION_CREATED", actor_type="AGENT", actor_id=str(agent.id), payload={"decision": decision.value, "risk_score": str(score), "risk_band": assessment.band.value, "model_version": model.version, "policy_version": policy.version, "reason_codes": reason_codes}))
+    session.add(AuditEvent(id=uuid4(), transaction_id=transaction_id, event_type="RISK_DECISION_CREATED", actor_type="AGENT", actor_id=str(agent.id), payload={"decision": decision.value, "risk_score": str(score), "risk_band": assessment.band.value, "model_version": model.version, "policy_version": policy.version, "feature_version": FEATURE_VERSION, "reason_codes": reason_codes}))
     await session.flush()
     response = RiskEvaluateResponse(transaction_id=transaction_id, decision=decision.value, risk_score=score, risk_band=assessment.band.value, model_version=model.version, policy_version=policy.version, reason_codes=reason_codes, external_payment_created=False)
     await session.execute(update(IdempotencyRecord).where(IdempotencyRecord.scope == scope, IdempotencyRecord.key == request.idempotency_key).values(response_status=200, response_body=response.model_dump(mode="json")))
