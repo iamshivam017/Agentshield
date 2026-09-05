@@ -32,10 +32,13 @@ TRAINED -> EVALUATED -> CANDIDATE -> APPROVED -> ACTIVE
 Use an authenticated admin operator. The API endpoints are:
 
 ```text
+POST /api/v1/models/{version}/evaluate
 POST /api/v1/models/{version}/candidate
 POST /api/v1/models/{version}/approve
 POST /api/v1/models/{version}/activate
 ```
+
+Run them in order. The `evaluate` transition records that the persisted training/evaluation evidence has passed the governance checkpoint; it does not retrain or mutate model metrics.
 
 Send both `X-Operator-API-Key` and `X-Operator-ID` headers required by the configured control-plane authentication policy.
 
