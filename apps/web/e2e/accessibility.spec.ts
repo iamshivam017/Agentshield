@@ -4,7 +4,8 @@ import { expect, test } from '@playwright/test';
 // Keep the adapter boundary isolated because @axe-core/playwright may expose
 // a distinct nested Playwright Page type while accepting the same runtime page.
 function createAxeBuilder(page: unknown) {
-  return new AxeBuilder({ page: page as any });
+  type AxePage = ConstructorParameters<typeof AxeBuilder>[0]['page'];
+  return new AxeBuilder({ page: page as AxePage });
 }
 
 test('command center has no critical accessibility violations', async ({ page }) => {
