@@ -30,6 +30,17 @@ class InProcessRateStore:
             return len(events)
 
 
+class InProcessRateLimiter:
+    """Backward-compatible local limiter facade used by unit tests and development."""
+
+    def __init__(self) -> None:
+        self._store = InProcessRateStore()
+
+    def check(self, key: str) -> None:
+        count = self._store.check(key, settings.rate_limit_requests, settings.rate_limit_window_seconds)
+        _enforce_limit(count)
+
+
 _REDIS_RATE_SCRIPT = """
 local count = redis.call('INCR', KEYS[1])
 if count == 1 then
@@ -79,13 +90,18 @@ class RateLimiter:
 
     @staticmethod
     def _check_store(store: RateStore, key: str, limit: int, window: int) -> None:
-        count = store.check(key, limit, window)
-        if count > limit:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="rate_limit_exceeded",
-                headers={"Retry-After": str(max(1, window - int(time()) % window))},
-            )
+        _enforce_limit(store.check(key, limit, window))
+
+
+def _enforce_limit(count: int) -> None:
+    limit = settings.rate_limit_requests
+    window = settings.rate_limit_window_seconds
+    if count > limit:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="rate_limit_exceeded",
+            headers={"Retry-After": str(max(1, window - int(time()) % window))},
+        )
 
 
 def build_rate_limiter() -> RateLimiter:
@@ -100,4 +116,3 @@ def build_rate_limiter() -> RateLimiter:
 
 
 rate_limiter = build_rate_limiter()
-InProcessRateLimiter = InProcessRateStore
