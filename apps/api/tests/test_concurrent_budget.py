@@ -6,11 +6,11 @@ from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from agentshield_api.config import settings
 from agentshield_api.db import SessionLocal
-from agentshield_api.models import Agent, AgentPolicy, Merchant, RiskDecision, Transaction
+from agentshield_api.models import Agent, AgentBudgetState, AgentPolicy, Merchant, RiskDecision, Transaction
 from app.main import app
 from app.payment_contracts import PaymentOrderRequest
 from app.razorpay import MockPaymentProvider
@@ -24,11 +24,12 @@ async def test_concurrent_payment_orders_do_not_exceed_daily_budget(monkeypatch:
     monkeypatch.setattr(settings, "app_env", "development")
     monkeypatch.setattr(settings, "razorpay_key_id", "rzp_test_concurrency")
     monkeypatch.setattr(settings, "razorpay_key_secret", "test-secret")
-    monkeypatch.setattr(app.state, "budget_concurrency_marker", True, raising=False)
+
+    provider = MockPaymentProvider()
 
     class FakeRazorpayProvider:
         async def create_order(self, *, amount: Decimal, currency: str, receipt: str):
-            return await MockPaymentProvider().create_order(amount=amount, currency=currency, receipt=receipt)
+            return await provider.create_order(amount=amount, currency=currency, receipt=receipt)
 
     monkeypatch.setattr("app.main.RazorpayTestProvider", FakeRazorpayProvider)
 
@@ -80,7 +81,7 @@ async def test_concurrent_payment_orders_do_not_exceed_daily_budget(monkeypatch:
             )
         await session.commit()
 
-    async def place_order(transaction_id):
+    async def place_order(transaction_id) -> int:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
             response = await client.post(
                 "/api/v1/payments/orders",
@@ -92,13 +93,12 @@ async def test_concurrent_payment_orders_do_not_exceed_daily_budget(monkeypatch:
             return response.status_code
 
     statuses = await asyncio.gather(*(place_order(transaction_id) for transaction_id in transaction_ids))
-    assert sorted(statuses).count(200) == 3
-    assert sorted(statuses).count(409) == 2
+    assert statuses.count(200) == 3
+    assert statuses.count(409) == 2
 
     async with SessionLocal() as session:
-        from agentshield_api.models import AgentBudgetState
         state = await session.scalar(
-            __import__("sqlalchemy").select(AgentBudgetState).where(
+            select(AgentBudgetState).where(
                 AgentBudgetState.agent_id == agent_id,
                 AgentBudgetState.period_key == "2026-09-05",
             )
