@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentshield_api.db import get_session
-from agentshield_api.models import Agent, AgentPolicy, AuditEvent, Investigation, PolicyEvaluation, RiskDecision, RiskPrediction, Transaction, TransactionFeature
+from agentshield_api.models import AuditEvent, Investigation, PolicyEvaluation, RiskDecision, RiskPrediction, Transaction, TransactionFeature
 from app.investigation_service import ReadOnlyLLMProvider, build_evidence
 
 router = APIRouter(prefix="/api/v1/risk/transactions", tags=["investigations"])
