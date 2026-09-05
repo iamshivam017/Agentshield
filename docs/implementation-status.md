@@ -44,6 +44,8 @@
 - [x] Payment order/provider-payment state
 - [x] Webhook event deduplication key
 - [x] Payment-state integrity constraints and terminal-capture guard
+- [x] Database terminal-capture immutability defense-in-depth
+- [x] Single-active-model database invariant
 - [x] Audit-event persistence
 - [x] Schema contract tests
 - [x] Alembic migration-chain tests
@@ -51,7 +53,7 @@
 - [x] PostgreSQL integration coverage for transaction/idempotency invariants
 - [x] PostgreSQL integration coverage for terminal payment state
 - [x] PostgreSQL integration coverage for webhook stale-state protection
-- [ ] Concurrent multi-request budget stress test
+- [x] Concurrent multi-request budget stress test
 - [ ] Database backup/restore verification
 
 ## M16 — Synthetic Dataset + Risk Model
@@ -71,7 +73,9 @@
 - [x] Artifact SHA-256 checksum generation and registry metadata
 - [x] CI runtime training smoke with verified artifact hand-off
 - [x] API serving path verifies model artifact checksum before load
-- [ ] Final trained model promoted to APPROVED/ACTIVE with persisted registry workflow
+- [x] Persisted model lifecycle governance: TRAINED → EVALUATED → CANDIDATE → APPROVED → ACTIVE → RETIRED
+- [x] Admin-only model lifecycle mutation endpoints
+- [ ] Final trained model promoted to APPROVED/ACTIVE with persisted production artifact
 
 ## M17 — Risk Decision API
 
@@ -104,6 +108,7 @@
 - [x] Production/staging control-plane authentication enforcement
 - [x] Viewer/analyst/admin role separation
 - [x] Server-trusted reviewer identity binding
+- [x] Investigation/reconciliation mutation role protection
 - [ ] Redis-backed distributed rate limiting
 - [ ] Full API integration suite in production-like environment
 
@@ -127,6 +132,7 @@
 - [x] Provider reconciliation contract
 - [x] Deterministic reconciliation endpoint
 - [x] Reconciliation audit event
+- [x] Reconciliation telemetry
 - [ ] Live Razorpay Test Mode credential execution
 - [ ] Live webhook replay against Razorpay Test Mode
 
@@ -164,8 +170,9 @@
 - [x] Correlation ID propagation
 - [x] Prometheus-compatible `/metrics` endpoint
 - [x] Low-cardinality domain telemetry primitives
-- [x] Investigation and payment reconciliation telemetry
+- [x] Risk decision, model, policy, investigation, and payment telemetry
 - [x] Observability contract documentation
+- [x] Prometheus scrape configuration
 - [x] Baseline alert rules
 - [x] Operational incident runbooks
 - [x] k6 risk-evaluation load profile
@@ -181,6 +188,7 @@
 - [x] Request/correlation telemetry foundation
 - [x] Metrics and alert contract
 - [x] Incident runbooks
+- [x] Concurrent budget invariant test
 - [ ] Centralized multi-instance metrics backend deployment
 - [ ] Redis-backed distributed rate limiting
 - [ ] Load/stress/soak benchmark execution against target environment
@@ -200,11 +208,11 @@
 - [x] ML tests/compile
 - [x] ML dependency audit
 - [x] API + web container builds
-- [x] Live PostgreSQL migration check
+- [x] Live PostgreSQL migration check through current migration chain
 - [x] Browser E2E execution in CI
 - [x] Runtime ML training smoke execution in CI
 - [x] Trained smoke artifact checksum verification in API CI
 
 ## Next checkpoint
 
-Complete centralized multi-instance telemetry, execute the k6 performance profile in a target-like environment, finish final model APPROVED/ACTIVE promotion, add deployment/IaC/rollback artifacts, run backup/restore and concurrent-budget drills, then perform the five-reviewer production gap audit and final readiness scorecard.
+Verify the current CI suite after the model-governance and concurrency additions. Then complete final artifact promotion, deployment/IaC/rollback, backup/restore, authenticated browser coverage, accessibility audit, target-environment performance execution, and the five-reviewer production gap audit.
