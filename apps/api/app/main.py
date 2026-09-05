@@ -434,3 +434,8 @@ async def razorpay_webhook(request: Request, session: AsyncSession = Depends(get
         event_row.processed = True
     await session.commit()
     return {"status": "accepted", "event": str(event_type or "unknown")}
+
+
+from agentshield_api.policy_routes import register_policy_routes
+
+register_policy_routes(app)
