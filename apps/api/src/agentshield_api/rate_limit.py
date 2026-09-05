@@ -4,7 +4,7 @@ from collections import defaultdict, deque
 import os
 from threading import Lock
 from time import monotonic, time
-from typing import Protocol
+from typing import Protocol, cast
 
 from fastapi import HTTPException, status
 
@@ -48,8 +48,8 @@ class RedisRateStore:
     def check(self, key: str, limit: int, window_seconds: int) -> int:
         bucket = int(time() // window_seconds)
         redis_key = f"agentshield:rate:{window_seconds}:{bucket}:{key}"
-        result = self._client.eval(_REDIS_RATE_SCRIPT, 1, redis_key, window_seconds)
-        return int(result)
+        result = self._client.eval(_REDIS_RATE_SCRIPT, 1, str(window_seconds))
+        return int(cast(str, result))
 
 
 class RateLimiter:
