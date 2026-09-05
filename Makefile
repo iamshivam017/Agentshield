@@ -1,4 +1,4 @@
-.PHONY: install dev lint format typecheck test test-unit test-integration test-e2e security build db-migrate db-seed ml-all ml-verify perf-smoke production-check verify verify-all infra-up infra-down
+.PHONY: install dev lint format typecheck test test-unit test-integration test-e2e security build db-migrate db-seed ml-all ml-verify perf-smoke db-backup-restore-smoke production-check verify verify-all infra-up infra-down
 
 PYTHONPATH := apps/api/src:apps/api
 ML_PYTHONPATH := ml/src
@@ -64,6 +64,9 @@ ml-verify:
 
 perf-smoke:
 	PYTHONPATH=$(PYTHONPATH) python scripts/perf_smoke.py
+
+db-backup-restore-smoke:
+	bash scripts/backup_restore_smoke.sh
 
 production-check:
 	PYTHONPATH=$(PYTHONPATH) python scripts/production_check.py
