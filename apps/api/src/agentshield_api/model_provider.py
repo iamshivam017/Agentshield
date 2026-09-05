@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Protocol
@@ -9,7 +10,7 @@ import joblib  # type: ignore[import-untyped]
 import numpy as np
 
 from .config import settings
-from .features import FEATURE_NAMES
+from .features import FEATURE_NAMES, FEATURE_VERSION
 
 
 class ModelUnavailable(RuntimeError):
@@ -67,17 +68,36 @@ class DevelopmentHeuristicModel:
 
 
 class VerifiedArtifactModel:
-    """Loads a trusted joblib classifier only after checksum verification."""
+    """Loads a trusted joblib classifier only after checksum and metadata verification."""
 
     _feature_names = FEATURE_NAMES
 
-    def __init__(self, *, path: str, expected_sha256: str, version: str) -> None:
+    def __init__(self, *, path: str, expected_sha256: str, version: str, metadata_path: str | None = None) -> None:
         artifact = Path(path)
         if not artifact.is_file():
             raise ModelUnavailable("risk model artifact path does not exist")
         actual = hashlib.sha256(artifact.read_bytes()).hexdigest()
         if actual.lower() != expected_sha256.lower():
             raise ModelUnavailable("risk model artifact checksum mismatch")
+
+        if metadata_path:
+            metadata_file = Path(metadata_path)
+            if not metadata_file.is_file():
+                raise ModelUnavailable("risk model metadata path does not exist")
+            try:
+                metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                raise ModelUnavailable("risk model metadata could not be read") from exc
+            metadata_sha = str(metadata.get("artifact_sha256", ""))
+            if metadata_sha.lower() != actual.lower():
+                raise ModelUnavailable("risk model metadata checksum mismatch")
+            if metadata.get("feature_version") != FEATURE_VERSION:
+                raise ModelUnavailable("risk model feature version mismatch")
+            if metadata.get("model_version") != version:
+                raise ModelUnavailable("risk model version mismatch")
+            if metadata.get("status") not in {"APPROVED", "ACTIVE"}:
+                raise ModelUnavailable("risk model is not APPROVED/ACTIVE")
+
         try:
             loaded: Any = joblib.load(artifact)
         except Exception as exc:  # noqa: BLE001 - convert deserialization failures to a serving error
@@ -96,6 +116,9 @@ class VerifiedArtifactModel:
         category: str,
     ) -> tuple[Decimal, list[str]]:
         values = features or _fallback_features(amount=amount)
+        missing = [name for name in self._feature_names if name not in values]
+        if missing:
+            raise ModelUnavailable(f"risk model input features missing: {','.join(missing)}")
         matrix = np.asarray([[values[name] for name in self._feature_names]], dtype=float)
         try:
             probability = float(self._model.predict_proba(matrix)[0][1])
@@ -130,5 +153,6 @@ class ModelProvider:
                 path=settings.risk_model_artifact_path,
                 expected_sha256=settings.risk_model_artifact_sha256,
                 version=getattr(settings, "risk_model_version", "artifact-unversioned"),
+                metadata_path=settings.risk_model_metadata_path,
             )
         return self._artifact_model
