@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     transaction_limit_default: str = "10000.00"
     daily_limit_default: str = "50000.00"
     verification_threshold: str = "0.25"
+    agent_api_key: str | None = None
+    require_agent_auth: bool = False
+    rate_limit_requests: int = 60
+    rate_limit_window_seconds: int = 60
 
 
 settings = Settings()
