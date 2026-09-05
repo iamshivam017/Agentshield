@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     rate_limit_window_seconds: int = 60
     risk_model_artifact_path: str | None = None
     risk_model_artifact_sha256: str | None = None
+    risk_model_version: str = "artifact-unversioned"
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
     razorpay_webhook_secret: str = ""
