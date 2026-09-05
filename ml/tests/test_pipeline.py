@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from agentshield_ml.evaluate import evaluate_threshold, select_threshold
+from agentshield_ml.evaluate import calibration_metrics, evaluate_threshold, select_threshold
 from agentshield_ml.features import build_features
 from agentshield_ml.synthetic import SyntheticConfig, generate_transactions
 from agentshield_ml.train import chronological_split
@@ -41,3 +41,12 @@ def test_threshold_metrics_and_cost_selection() -> None:
 
     chosen = select_threshold(y_true, probabilities, min_precision=0.8, min_recall=0.8)
     assert 0.0 < chosen.threshold < 1.0
+
+
+def test_calibration_metrics_are_bounded() -> None:
+    y_true = np.array([0, 0, 1, 1])
+    probabilities = np.array([0.1, 0.2, 0.8, 0.9])
+    metrics = calibration_metrics(y_true, probabilities, bins=4)
+    assert 0.0 <= metrics["brier_score"] <= 1.0
+    assert 0.0 <= metrics["expected_calibration_error"] <= 1.0
+    assert metrics["bins"] == 4.0
