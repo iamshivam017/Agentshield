@@ -7,4 +7,4 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
-          - ${AGENTSHIELD_API_TARGET:-api:8000}
+          - api:8000
