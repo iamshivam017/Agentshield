@@ -12,7 +12,7 @@ from agentshield_api.contracts import RiskEvaluateRequest, RiskEvaluateResponse
 from agentshield_api.db import get_session
 from agentshield_api.model_provider import ModelProvider, ModelUnavailable
 from agentshield_api.models import Agent, AgentPolicy, Merchant, RiskDecision, RiskPrediction, Transaction
-from agentshield_api.risk import Decision, PolicyContext, RiskAssessment, classify_score, decide, evaluate_policy
+from agentshield_api.risk import PolicyContext, RiskAssessment, classify_score, decide, evaluate_policy
 
 app = FastAPI(
     title="AgentShield API",
@@ -95,17 +95,18 @@ async def evaluate_risk(
     decision = decide(assessment, policy_result, verification_threshold)
 
     transaction_id = uuid4()
-    transaction = Transaction(
-        id=transaction_id,
-        agent_id=agent.id,
-        merchant_id=merchant.id,
-        amount=request.amount,
-        currency=request.currency,
-        device_id=request.device_id,
-        occurred_at=request.occurred_at,
-        status="EVALUATED",
+    session.add(
+        Transaction(
+            id=transaction_id,
+            agent_id=agent.id,
+            merchant_id=merchant.id,
+            amount=request.amount,
+            currency=request.currency,
+            device_id=request.device_id,
+            occurred_at=request.occurred_at,
+            status="EVALUATED",
+        )
     )
-    session.add(transaction)
     session.add(
         RiskPrediction(
             id=uuid4(),
@@ -130,6 +131,9 @@ async def evaluate_risk(
     )
     await session.commit()
 
+    # Evaluation is advisory to the payment provider in this vertical slice.
+    # No external order is created here; that occurs only after a real provider
+    # adapter is integrated and the ALLOW path passes its own invariants.
     return RiskEvaluateResponse(
         transaction_id=transaction_id,
         decision=decision.value,
@@ -138,5 +142,5 @@ async def evaluate_risk(
         model_version=model.version,
         policy_version=policy.version,
         reason_codes=policy_result.violations + model_signals,
-        external_payment_created=decision is Decision.ALLOW,
+        external_payment_created=False,
     )
