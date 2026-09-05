@@ -8,9 +8,9 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from .config import settings
 
@@ -69,12 +69,7 @@ def require_operator(
     x_operator_id: str | None = None,
     allowed_roles: Iterable[str] | None = None,
 ) -> OperatorPrincipal:
-    """Return a server-trusted operator identity.
-
-    In development, auth may be disabled for local UX. In staging/production,
-    credentials are mandatory and the role is derived from the configured secret;
-    a client cannot select its own role.
-    """
+    """Return a server-trusted operator identity."""
     protected_environment = settings.app_env.lower() in {"production", "staging"}
     auth_required = settings.require_operator_auth or protected_environment
     credentials = _operator_credentials()
@@ -119,6 +114,8 @@ def _required_roles(path: str, method: str) -> set[str] | None:
         return {ROLE_VIEWER, ROLE_ANALYST, ROLE_ADMIN}
     if path == "/api/v1/models" and method == "GET":
         return {ROLE_VIEWER, ROLE_ANALYST, ROLE_ADMIN}
+    if path.startswith("/api/v1/models/") and method == "POST":
+        return {ROLE_ADMIN}
     if path == "/api/v1/audit" and method == "GET":
         return {ROLE_VIEWER, ROLE_ANALYST, ROLE_ADMIN}
     if path == "/api/v1/risk/metrics" and method == "GET":
