@@ -5,7 +5,7 @@ test('command center has no critical accessibility violations', async ({ page })
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
 
-  const results = await new AxeBuilder({ page }).analyze();
+  const results = await new AxeBuilder({ page: page as never }).analyze();
   const critical = results.violations.filter((violation) => violation.impact === 'critical');
   expect(critical, JSON.stringify(critical, null, 2)).toEqual([]);
 });
