@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class RiskEvaluateRequest(BaseModel):
@@ -93,6 +94,56 @@ class ReviewResponse(BaseModel):
     outcome: str
     note: str | None
     created_at: datetime
+
+
+class PolicyCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    agent_id: UUID
+    rules: dict[str, Any]
+
+    @model_validator(mode="after")
+    def validate_and_normalize_rules(self) -> "PolicyCreateRequest":
+        allowed_keys = {"transaction_limit", "daily_limit", "verification_threshold", "allowed_categories"}
+        unknown = set(self.rules) - allowed_keys
+        if unknown:
+            raise ValueError(f"unknown_policy_rule:{','.join(sorted(unknown))}")
+
+        normalized: dict[str, Any] = {}
+        for key in ("transaction_limit", "daily_limit", "verification_threshold"):
+            if key not in self.rules:
+                raise ValueError(f"missing_policy_rule:{key}")
+            try:
+                value = Decimal(str(self.rules[key]))
+            except (InvalidOperation, ValueError, TypeError) as exc:
+                raise ValueError(f"invalid_policy_rule:{key}") from exc
+            if not value.is_finite() or value <= Decimal("0"):
+                raise ValueError(f"invalid_policy_rule:{key}")
+            if key != "verification_threshold" and value.as_tuple().exponent < -2:
+                raise ValueError(f"invalid_policy_rule:{key}")
+            normalized[key] = str(value.quantize(Decimal("0.01") if key != "verification_threshold" else Decimal("0.000001")))
+
+        transaction_limit = Decimal(normalized["transaction_limit"])
+        daily_limit = Decimal(normalized["daily_limit"])
+        threshold = Decimal(normalized["verification_threshold"])
+        if daily_limit < transaction_limit:
+            raise ValueError("daily_limit_must_cover_transaction_limit")
+        if threshold > Decimal("1"):
+            raise ValueError("verification_threshold_out_of_range")
+
+        categories = self.rules.get("allowed_categories", [])
+        if categories is None:
+            categories = []
+        if not isinstance(categories, list) or len(categories) > 100:
+            raise ValueError("invalid_allowed_categories")
+        normalized_categories: list[str] = []
+        for category in categories:
+            if not isinstance(category, str) or not 1 <= len(category.strip()) <= 80:
+                raise ValueError("invalid_allowed_categories")
+            normalized_categories.append(category.strip().upper())
+        normalized["allowed_categories"] = list(dict.fromkeys(normalized_categories))
+        self.rules = normalized
+        return self
 
 
 class PolicyItem(BaseModel):
