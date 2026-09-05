@@ -109,10 +109,26 @@
 - [ ] Webhook replay/out-of-order integration tests
 - [ ] Provider reconciliation path
 
+## M19 — Risk Analyst Command Center
+
+- [x] Executive risk posture dashboard shell
+- [x] Risk queue table with decision/risk metadata
+- [x] Demo scenario simulator
+- [x] Model health / decision mix / control-plane cards
+- [x] Track 02 and Test Mode safety boundary in UI
+- [x] Responsive layout foundations
+- [x] Keyboard-focusable navigation controls
+- [ ] Real API data wiring
+- [ ] Investigation workspace
+- [ ] Policy management UI
+- [ ] Model evaluation UI
+- [ ] Audit explorer
+- [ ] System health detail page
+- [ ] Accessibility automated audit
+- [ ] Browser E2E tests
+
 ## Next checkpoint
 
-M15.1 — Live PostgreSQL migration + persistence integration verification.
+M15.1 — Live PostgreSQL migration + persistence integration verification, while M19 continues through real API wiring.
 
-Payment integration is now structurally implemented but deliberately not marked live/verified. Razorpay documents that webhook signatures use HMAC-SHA256 over the raw request body and that duplicate events can be identified with `x-razorpay-event-id`; order creation uses an integer amount in the smallest currency sub-unit. citeturn909523search0turn909523search2
-
-The remaining gate is runtime verification: execute migrations and integration tests locally, then train and evaluate the real model artifact before enabling production-mode serving.
+The first polished Risk Analyst Command Center experience is now committed. It intentionally uses clearly labeled sandbox/demo values until backend endpoints are wired; it does not present demo statistics as measured production metrics.
