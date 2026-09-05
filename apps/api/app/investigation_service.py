@@ -76,8 +76,8 @@ def build_evidence(*, transaction: Any, decision: Any, prediction: Any, policy_e
 
 
 def _deterministic(*, evidence: list[EvidenceItem], authoritative_decision: str) -> InvestigationResult:
-    violations = next((item.value for item in evidence if item.id == "E6"), [])
-    reasons = next((item.value for item in evidence if item.id == "E11"), [])
+    violations: list[Any] = list(next((item.value for item in evidence if item.id == "E6"), []) or [])
+    reasons: list[Any] = list(next((item.value for item in evidence if item.id == "E11"), []) or [])
     risk_band = next((item.value for item in evidence if item.id == "E3"), "UNKNOWN")
     if violations:
         assessment = "Policy enforcement is the primary reason this case requires intervention."
