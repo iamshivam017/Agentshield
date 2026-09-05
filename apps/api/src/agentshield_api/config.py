@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     verification_threshold: str = "0.25"
     agent_api_key: str | None = None
     require_agent_auth: bool = False
+    operator_api_key: str | None = None
+    require_operator_auth: bool = False
     rate_limit_requests: int = 60
     rate_limit_window_seconds: int = 60
     risk_model_artifact_path: str | None = None
