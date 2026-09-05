@@ -36,10 +36,13 @@ def upgrade() -> None:
         DROP TRIGGER IF EXISTS trg_agent_policy_immutable ON agent_policies
         """
     )
+    -- Policy deletion remains governed by the owning agent's lifecycle.
+    -- Application APIs never expose policy deletion; UPDATE is blocked so
+    -- historical policy contents and activation state cannot be rewritten.
     op.execute(
         """
         CREATE TRIGGER trg_agent_policy_immutable
-        BEFORE UPDATE OR DELETE ON agent_policies
+        BEFORE UPDATE ON agent_policies
         FOR EACH ROW
         EXECUTE FUNCTION prevent_agent_policy_mutation()
         """
