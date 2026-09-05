@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentshield_api.db import get_session
 from agentshield_api.models import AuditEvent, Investigation, PolicyEvaluation, RiskDecision, RiskPrediction, Transaction, TransactionFeature
+from agentshield_api.observability import telemetry
 from app.investigation_service import ReadOnlyLLMProvider, build_evidence
 
 router = APIRouter(prefix="/api/v1/risk/transactions", tags=["investigations"])
@@ -37,6 +38,7 @@ async def create_investigation(transaction_id: UUID, session: AsyncSession = Dep
         audits=audits,
     )
     result = await ReadOnlyLLMProvider().investigate(evidence=evidence, authoritative_decision=decision.decision)
+    telemetry.increment("investigations_total", provider=result.provider, status=result.status)
 
     investigation = await session.scalar(select(Investigation).where(Investigation.transaction_id == transaction_id))
     if investigation is None:
