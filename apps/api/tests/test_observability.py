@@ -14,6 +14,15 @@ def test_telemetry_records_requests_and_failures() -> None:
     assert snapshot["latency_ms_total"]["POST /api/v1/risk/evaluate"] == 7
 
 
+def test_domain_counters_render_low_cardinality_labels() -> None:
+    telemetry = Telemetry()
+    telemetry.increment("risk_decisions_total", decision="BLOCK", risk_band="HIGH")
+    telemetry.increment("policy_violations_total", reason="DAILY_LIMIT_EXCEEDED")
+    snapshot = telemetry.snapshot()
+    assert snapshot["domain"][("risk_decisions_total", (("decision", "BLOCK"), ("risk_band", "HIGH")))] == 1
+    assert "agentshield_risk_decisions_total" in __import__("agentshield_api.observability", fromlist=["prometheus_snapshot"]).prometheus_snapshot()
+
+
 def test_prometheus_snapshot_is_nonempty() -> None:
     output = prometheus_snapshot()
     assert "agentshield_http_requests_total" in output
