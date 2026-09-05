@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
 
@@ -31,7 +32,7 @@ async def test_database_keeps_captured_payment_terminal() -> None:
                 amount=Decimal("25.00"),
                 currency="INR",
                 device_id="payment-state-device",
-                occurred_at="2026-09-05T10:00:00+00:00",
+                occurred_at=datetime(2026, 9, 5, 10, 0, tzinfo=timezone.utc),
                 status="EVALUATED",
             )
         )
