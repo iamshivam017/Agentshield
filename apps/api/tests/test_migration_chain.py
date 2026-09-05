@@ -11,7 +11,7 @@ def test_alembic_has_single_head() -> None:
     scripts = ScriptDirectory.from_config(config)
 
     heads = scripts.get_heads()
-    assert heads == ["0002_risk_ai_payment_schema"]
+    assert heads == ["0003_policy_immutability"]
 
 
 def test_migration_chain_is_linear() -> None:
@@ -19,6 +19,10 @@ def test_migration_chain_is_linear() -> None:
     config = Config(str(api_root / "alembic.ini"))
     config.set_main_option("script_location", str(api_root / "migrations"))
     scripts = ScriptDirectory.from_config(config)
+
+    head = scripts.get_revision("0003_policy_immutability")
+    assert head is not None
+    assert head.down_revision == "0002_risk_ai_payment_schema"
 
     revision = scripts.get_revision("0002_risk_ai_payment_schema")
     assert revision is not None
