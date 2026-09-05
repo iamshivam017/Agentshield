@@ -81,38 +81,42 @@ const metrics = {
 };
 
 async function installApiMocks(page: import('@playwright/test').Page) {
-  await page.route('**/api/v1/**', async route => {
-    const url = new URL(route.request().url());
-    const pathname = url.pathname;
+  await page.addInitScript(({ transactionId, queueItem, detail, metrics }) => {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
+      const pathname = new URL(url, window.location.origin).pathname;
 
-    if (pathname.endsWith('/risk/metrics')) {
-      await route.fulfill({ json: metrics });
-      return;
-    }
-    if (pathname.endsWith('/risk/transactions')) {
-      await route.fulfill({ json: { items: [queueItem], total: 1, limit: 8, offset: 0 } });
-      return;
-    }
-    if (pathname.endsWith(`/risk/transactions/${transactionId}/review`)) {
-      await route.fulfill({
-        status: 201,
-        json: {
-          id: '55555555-5555-4555-8555-555555555555',
-          transaction_id: transactionId,
-          reviewer_id: 'dashboard-operator',
-          outcome: 'APPROVE',
-          note: null,
-          created_at: '2026-09-05T10:31:00Z',
-        },
-      });
-      return;
-    }
-    if (pathname.endsWith(`/risk/transactions/${transactionId}`)) {
-      await route.fulfill({ json: detail });
-      return;
-    }
-    await route.fulfill({ json: [] });
-  });
+      const jsonResponse = (body: unknown, status = 200) =>
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+      if (pathname.endsWith('/risk/metrics')) return jsonResponse(metrics);
+      if (pathname.endsWith('/risk/transactions')) {
+        return jsonResponse({ items: [queueItem], total: 1, limit: 8, offset: 0 });
+      }
+      if (pathname.endsWith(`/risk/transactions/${transactionId}/review`)) {
+        return jsonResponse(
+          {
+            id: '55555555-5555-4555-8555-555555555555',
+            transaction_id: transactionId,
+            reviewer_id: 'dashboard-operator',
+            outcome: 'APPROVE',
+            note: null,
+            created_at: '2026-09-05T10:31:00Z',
+          },
+          201,
+        );
+      }
+      if (pathname.endsWith(`/risk/transactions/${transactionId}`)) return jsonResponse(detail);
+      if (pathname.includes('/policies') || pathname.includes('/models') || pathname.includes('/audit')) return jsonResponse([]);
+      if (pathname.endsWith('/health/ready')) return jsonResponse({ status: 'ready' });
+
+      return originalFetch(input, init);
+    };
+  }, { transactionId, queueItem, detail, metrics });
 }
 
 test('loads the risk command center and completes an investigation review', async ({ page }) => {
