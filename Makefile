@@ -1,9 +1,11 @@
 .PHONY: install dev lint format typecheck test test-unit test-integration test-e2e security build db-migrate db-seed ml-all perf-smoke production-check verify verify-all infra-up infra-down
 
 PYTHONPATH := apps/api/src:apps/api
+ML_PYTHONPATH := ml/src
 
 install:
 	python -m pip install -r apps/api/requirements.txt
+	python -m pip install -r ml/requirements.txt
 	cd apps/web && npm ci
 
 dev:
@@ -29,6 +31,7 @@ typecheck:
 
 test:
 	PYTHONPATH=$(PYTHONPATH) pytest -q
+	PYTHONPATH=$(ML_PYTHONPATH) pytest -q ml/tests
 
 test-unit:
 	PYTHONPATH=$(PYTHONPATH) pytest -q apps/api/tests/unit
@@ -41,6 +44,7 @@ test-e2e:
 
 security:
 	PYTHONPATH=$(PYTHONPATH) python -m pip_audit -r apps/api/requirements.txt
+	python -m pip_audit -r ml/requirements.txt
 	cd apps/web && npm audit --audit-level=high
 
 build:
@@ -53,7 +57,7 @@ db-seed:
 	PYTHONPATH=$(PYTHONPATH) python scripts/seed.py
 
 ml-all:
-	PYTHONPATH=$(PYTHONPATH) python scripts/ml_pipeline.py
+	PYTHONPATH=$(ML_PYTHONPATH) python -m agentshield_ml.train
 
 perf-smoke:
 	PYTHONPATH=$(PYTHONPATH) python scripts/perf_smoke.py
