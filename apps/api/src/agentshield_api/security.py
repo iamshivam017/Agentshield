@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from secrets import compare_digest
 from typing import Iterable
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from starlette.requests import Request
+from starlette.responses import Response
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from .config import settings
 
@@ -77,8 +81,7 @@ def require_operator(
     if auth_required and not credentials:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="operator_auth_not_configured")
     if not auth_required:
-        role = ROLE_ADMIN
-        return OperatorPrincipal(operator_id=x_operator_id or "local-operator", role=role)
+        return OperatorPrincipal(operator_id=x_operator_id or "local-operator", role=ROLE_ADMIN)
 
     if x_operator_api_key is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_operator_credentials")
@@ -97,3 +100,51 @@ def require_operator(
 
     operator_id = x_operator_id or f"{matched_role}:operator"
     return OperatorPrincipal(operator_id=operator_id, role=matched_role)
+
+
+def _required_roles(path: str, method: str) -> set[str] | None:
+    """Map control-plane resources to least-privilege roles."""
+    if path == "/api/v1/policies" and method == "POST":
+        return {ROLE_ADMIN}
+    if path.startswith("/api/v1/risk/transactions/") and path.endswith("/review") and method == "POST":
+        return {ROLE_ANALYST, ROLE_ADMIN}
+    if path.startswith("/api/v1/risk/transactions") and method == "GET":
+        return {ROLE_VIEWER, ROLE_ANALYST, ROLE_ADMIN}
+    if path == "/api/v1/policies" and method == "GET":
+        return {ROLE_VIEWER, ROLE_ANALYST, ROLE_ADMIN}
+    if path == "/api/v1/models" and method == "GET":
+        return {ROLE_VIEWER, ROLE_ANALYST, ROLE_ADMIN}
+    if path == "/api/v1/audit" and method == "GET":
+        return {ROLE_VIEWER, ROLE_ANALYST, ROLE_ADMIN}
+    if path == "/api/v1/risk/metrics" and method == "GET":
+        return {ROLE_VIEWER, ROLE_ANALYST, ROLE_ADMIN}
+    return None
+
+
+class ControlPlaneAuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        allowed_roles = _required_roles(request.url.path, request.method)
+        if allowed_roles is not None:
+            principal = require_operator(
+                request.headers.get("X-Operator-API-Key"),
+                request.headers.get("X-Operator-ID"),
+                allowed_roles,
+            )
+            request.state.operator = principal
+
+            if request.url.path.endswith("/review") and request.method == "POST":
+                try:
+                    body = await request.body()
+                    payload = json.loads(body)
+                except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    raise HTTPException(status_code=400, detail="invalid_review_payload") from exc
+                supplied_reviewer = payload.get("reviewer_id")
+                if supplied_reviewer != principal.operator_id:
+                    raise HTTPException(status_code=403, detail="reviewer_identity_mismatch")
+
+        return await call_next(request)
+
+
+def install_control_plane_security(app) -> None:
+    """Install auth middleware for analyst/operator control-plane APIs."""
+    app.add_middleware(ControlPlaneAuthMiddleware)
