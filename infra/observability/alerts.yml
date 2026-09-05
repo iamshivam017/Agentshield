@@ -11,12 +11,12 @@ groups:
           description: Investigate API logs, database readiness, and recent deployments.
 
       - alert: AgentShieldRiskLatencyHigh
-        expr: histogram_quantile(0.95, sum(rate(agentshield_http_latency_ms_bucket{path="/api/v1/risk/evaluate"}[5m])) by (le)) > 500
+        expr: sum(rate(agentshield_http_latency_ms_total{path="/api/v1/risk/evaluate"}[5m])) / clamp_min(sum(rate(agentshield_http_requests_total{path="/api/v1/risk/evaluate"}[5m])), 0.001) > 500
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: Risk evaluation p95 latency is above target
+          summary: Average risk evaluation latency is above target
           description: Inspect model serving, feature queries, connection pool saturation, and database plans.
 
       - alert: AgentShieldModelUnavailable
