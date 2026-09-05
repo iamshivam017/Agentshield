@@ -17,9 +17,3 @@ def install_error_handlers(app) -> None:
             status_code=422,
             content=error_payload("VALIDATION_ERROR", "Request validation failed", request_id),
         )
-
-    # Route registration stays outside main.py while preserving a single app
-    # bootstrap point. Import lazily to avoid a module-import cycle.
-    from .policy_routes import register_policy_routes
-
-    register_policy_routes(app)
