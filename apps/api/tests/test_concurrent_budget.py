@@ -67,6 +67,8 @@ async def test_concurrent_payment_orders_do_not_exceed_daily_budget(monkeypatch:
                     status="EVALUATED",
                 )
             )
+        await session.flush()
+        for transaction_id in transaction_ids:
             session.add(
                 RiskDecision(
                     id=uuid4(),
@@ -110,6 +112,7 @@ async def test_concurrent_payment_orders_do_not_exceed_daily_budget(monkeypatch:
         await session.execute(delete(RiskDecision).where(RiskDecision.transaction_id.in_(transaction_ids)))
         await session.execute(delete(Transaction).where(Transaction.id.in_(transaction_ids)))
         await session.execute(delete(AgentPolicy).where(AgentPolicy.agent_id == agent_id))
+        await session.execute(delete(AgentBudgetState).where(AgentBudgetState.agent_id == agent_id))
         await session.execute(delete(Merchant).where(Merchant.id == merchant_id))
         await session.execute(delete(Agent).where(Agent.id == agent_id))
         await session.commit()
