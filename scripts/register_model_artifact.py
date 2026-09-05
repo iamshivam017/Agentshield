@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from sqlalchemy import select
 
-from agentshield_api.database import AsyncSessionLocal
+from agentshield_api.database import SessionLocal
 from agentshield_api.models import EvaluationRun, ModelVersion
 
 
@@ -34,7 +34,7 @@ async def register(artifact_dir: Path) -> str:
     if actual_hash != expected_hash:
         raise SystemExit(f"artifact checksum mismatch: expected {expected_hash}, got {actual_hash}")
 
-    async with AsyncSessionLocal() as session:
+    async with SessionLocal() as session:
         existing = await session.scalar(select(ModelVersion).where(ModelVersion.version == version))
         if existing is not None:
             if existing.artifact_sha256 != expected_hash:
@@ -67,7 +67,7 @@ async def register(artifact_dir: Path) -> str:
             id=uuid4(),
             model_version=version,
             dataset_version=str(metadata.get("dataset_version", "unknown")),
-            metrics=metadata.get("frozen_test_metrics", {}),
+            metrics=frozen,
             threshold=metadata.get("threshold", 0),
             seed=int(metadata.get("seed", 0)),
         )
