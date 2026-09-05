@@ -47,9 +47,9 @@ from agentshield_api.models import (
     Transaction,
     WebhookEvent,
 )
-from payment_contracts import PaymentOrderRequest, PaymentOrderResponse
+from app.payment_contracts import PaymentOrderRequest, PaymentOrderResponse
+from app.razorpay import PaymentProviderError, RazorpayTestProvider, verify_webhook_signature
 from agentshield_api.rate_limit import rate_limiter
-from razorpay import PaymentProviderError, RazorpayTestProvider, verify_webhook_signature
 from agentshield_api.risk import PolicyContext, RiskAssessment, classify_score, decide, evaluate_policy
 from agentshield_api.security import authorize_agent
 
