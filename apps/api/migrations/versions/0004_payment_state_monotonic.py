@@ -1,13 +1,13 @@
 """Enforce monotonic payment state updates at the database boundary.
 
-Revision ID: 0004_payment_state_monotonic
-Revises: 0003_policy_immutability
+Revision ID: 0005_payment_state_monotonic
+Revises: 0004_payment_state_integrity
 """
 
 from alembic import op
 
-revision = "0004_payment_state_monotonic"
-down_revision = "0003_policy_immutability"
+revision = "0005_payment_state_monotonic"
+down_revision = "0004_payment_state_integrity"
 branch_labels = None
 depends_on = None
 
@@ -47,6 +47,8 @@ def upgrade() -> None:
         $$;
         """
     )
+    op.execute("DROP TRIGGER IF EXISTS payment_orders_state_monotonic ON payment_orders")
+    op.execute("DROP TRIGGER IF EXISTS provider_payments_state_monotonic ON provider_payments")
     op.execute(
         """
         CREATE TRIGGER payment_orders_state_monotonic
