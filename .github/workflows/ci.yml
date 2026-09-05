@@ -73,6 +73,26 @@ jobs:
         run: PYTHONPATH=ml/src pytest -q ml/tests
       - name: Compile ML package
         run: PYTHONPATH=ml/src python -m compileall -q ml/src
+      - name: Runtime training smoke
+        run: |
+          rm -rf /tmp/agentshield-model
+          PYTHONPATH=ml/src python -m agentshield_ml.train --rows 5000 --seed 42 --output-dir /tmp/agentshield-model
+          PYTHONPATH=ml/src python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path("/tmp/agentshield-model")
+          artifact = root / "model.joblib"
+          metadata = json.loads((root / "metadata.json").read_text())
+          digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+          assert metadata["artifact_sha256"] == digest
+          assert metadata["rows"] == 5000
+          assert metadata["selected_candidate"] in {"logistic", "xgboost"}
+          assert metadata["status"] == "EVALUATED"
+          assert set(metadata["frozen_test_metrics"]) >= {"precision", "recall", "f1", "pr_auc", "roc_auc", "fp", "fn"}
+          print(f"validated model artifact: {metadata['model_version']} sha256={digest}")
+          PY
       - name: Dependency audit
         run: python -m pip_audit -r ml/requirements.txt
 
