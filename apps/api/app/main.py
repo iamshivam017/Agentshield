@@ -271,6 +271,7 @@ async def get_risk_transaction(transaction_id: UUID, session: AsyncSession = Dep
     if row is None:
         raise HTTPException(status_code=404, detail="transaction_not_found")
     transaction, agent, merchant, decision = row
+    features = await session.scalar(select(TransactionFeature).where(TransactionFeature.transaction_id == transaction_id, TransactionFeature.feature_version == FEATURE_VERSION))
     prediction = await session.scalar(select(RiskPrediction).where(RiskPrediction.transaction_id == transaction_id).order_by(RiskPrediction.created_at.desc()))
     policy_eval = await session.scalar(select(PolicyEvaluation).where(PolicyEvaluation.transaction_id == transaction_id).order_by(PolicyEvaluation.evaluated_at.desc()))
     reviews = (await session.scalars(select(Review).where(Review.transaction_id == transaction_id).order_by(Review.created_at.desc()))).all()
@@ -282,6 +283,7 @@ async def get_risk_transaction(transaction_id: UUID, session: AsyncSession = Dep
         provider_payment = await session.scalar(select(ProviderPayment).where(ProviderPayment.payment_order_id == payment_order.id).order_by(ProviderPayment.created_at.desc()))
     return TransactionDetailResponse(
         transaction=queue_item(transaction, agent, merchant, decision),
+        features=None if features is None else {"version": features.feature_version, "values": features.values, "computed_at": features.computed_at.isoformat()},
         prediction=None if prediction is None else {"model_version": prediction.model_version, "score": str(prediction.score), "risk_band": prediction.risk_band, "signals": prediction.signals, "created_at": prediction.created_at.isoformat()},
         policy_evaluation=None if policy_eval is None else {"policy_version": policy_eval.policy_version, "result": policy_eval.result, "violations": policy_eval.violations, "evaluated_at": policy_eval.evaluated_at.isoformat()},
         decision_record={"decision": decision.decision, "risk_score": str(decision.risk_score), "risk_band": decision.risk_band, "model_version": decision.model_version, "policy_version": decision.policy_version, "reason_codes": decision.reason_codes},
