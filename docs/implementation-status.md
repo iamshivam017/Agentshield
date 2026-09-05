@@ -95,6 +95,7 @@
 - [x] PostgreSQL advisory-lock serialization for same idempotency key
 - [x] Agent API-key authentication boundary
 - [x] Agent identity binding to request body
+- [x] Protected staging/production environments force agent authentication
 - [x] Transactional daily budget reservation primitive
 - [x] Structured validation error envelope
 - [x] Request ID propagation
@@ -219,8 +220,10 @@
 
 ## Release gates still requiring environment-specific evidence
 
-1. Persist a real evaluated model artifact in the intended production artifact store, then execute the governed promotion path to APPROVED and ACTIVE.
-2. Run Razorpay Test Mode order creation and webhook replay with sandbox credentials; no production credentials are permitted.
-3. Execute k6 load/stress/soak tests against the selected deployment target and capture p95/p99 evidence.
-4. Select the deployment target, then add the matching IaC, immutable image release, secret configuration, migration/rollback procedure, and centralized metrics backend.
-5. Complete the five-reviewer production gap audit and final scorecard after the above evidence is available.
+- [ ] Final persistent model artifact promoted to APPROVED/ACTIVE
+- [ ] Razorpay Test Mode sandbox order + webhook replay evidence
+- [ ] Target deployment selected and deployed
+- [ ] k6 load/stress/soak evidence against target
+- [ ] Centralized production metrics backend deployed
+- [ ] Production rollback evidence
+- [ ] Final five-reviewer production gap audit
