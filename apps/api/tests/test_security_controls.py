@@ -4,8 +4,13 @@ import hashlib
 import json
 from uuid import uuid4
 
+import pytest
+from fastapi import HTTPException
+
+from agentshield_api.config import settings
 from agentshield_api.contracts import RiskEvaluateRequest
 from agentshield_api.rate_limit import InProcessRateLimiter
+from agentshield_api.security import authorize_agent, authorize_operator
 
 
 def canonical_business_fingerprint(request: RiskEvaluateRequest) -> str:
@@ -48,9 +53,42 @@ def test_rate_limiter_rejects_after_limit(monkeypatch) -> None:
     monkeypatch.setattr("agentshield_api.rate_limit.settings.rate_limit_requests", 1)
     limiter = InProcessRateLimiter()
     limiter.check("caller")
-    try:
+    with pytest.raises(Exception) as exc_info:
         limiter.check("caller")
-    except Exception as exc:
-        assert getattr(exc, "status_code", None) == 429
-    else:
-        raise AssertionError("second request should be rate limited")
+    assert getattr(exc_info.value, "status_code", None) == 429
+
+
+def test_agent_auth_binds_identity(monkeypatch) -> None:
+    agent_id = uuid4()
+    monkeypatch.setattr(settings, "require_agent_auth", True)
+    monkeypatch.setattr(settings, "agent_api_key", "agent-secret")
+
+    with pytest.raises(HTTPException) as missing:
+        authorize_agent(agent_id)
+    assert missing.value.status_code == 401
+
+    with pytest.raises(HTTPException) as mismatch:
+        authorize_agent(agent_id, "agent-secret", uuid4())
+    assert mismatch.value.status_code == 403
+
+    authorize_agent(agent_id, "agent-secret", agent_id)
+
+
+def test_operator_auth_requires_configured_secret(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "app_env", "staging")
+    monkeypatch.setattr(settings, "require_operator_auth", False)
+    monkeypatch.setattr(settings, "operator_api_key", None)
+    with pytest.raises(HTTPException) as not_configured:
+        authorize_operator()
+    assert not_configured.value.status_code == 503
+
+
+def test_operator_auth_validates_secret(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "app_env", "development")
+    monkeypatch.setattr(settings, "require_operator_auth", True)
+    monkeypatch.setattr(settings, "operator_api_key", "operator-secret")
+
+    with pytest.raises(HTTPException) as invalid:
+        authorize_operator("wrong")
+    assert invalid.value.status_code == 401
+    assert authorize_operator("operator-secret", "risk-admin") == "risk-admin"
