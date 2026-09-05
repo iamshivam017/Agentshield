@@ -109,6 +109,10 @@ def _required_roles(path: str, method: str) -> set[str] | None:
         return {ROLE_ADMIN}
     if path.startswith("/api/v1/risk/transactions/") and path.endswith("/review") and method == "POST":
         return {ROLE_ANALYST, ROLE_ADMIN}
+    if path.startswith("/api/v1/risk/transactions/") and path.endswith("/investigation") and method == "POST":
+        return {ROLE_ANALYST, ROLE_ADMIN}
+    if path.startswith("/api/v1/risk/transactions/") and path.endswith("/investigation") and method == "GET":
+        return {ROLE_VIEWER, ROLE_ANALYST, ROLE_ADMIN}
     if path.startswith("/api/v1/risk/transactions") and method == "GET":
         return {ROLE_VIEWER, ROLE_ANALYST, ROLE_ADMIN}
     if path == "/api/v1/policies" and method == "GET":
