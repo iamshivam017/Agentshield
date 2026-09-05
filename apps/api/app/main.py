@@ -6,22 +6,51 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import select, text, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentshield_api.config import settings
-from agentshield_api.contracts import RiskEvaluateRequest, RiskEvaluateResponse
+from agentshield_api.contracts import (
+    AuditItem,
+    ModelItem,
+    PolicyItem,
+    ReviewCreateRequest,
+    ReviewResponse,
+    RiskEvaluateRequest,
+    RiskEvaluateResponse,
+    RiskMetricsResponse,
+    RiskQueueItem,
+    RiskQueueResponse,
+    TransactionDetailResponse,
+)
 from agentshield_api.db import get_session
 from agentshield_api.errors import error_payload, install_error_handlers
 from agentshield_api.model_provider import ModelProvider, ModelUnavailable
-from agentshield_api.models import Agent, AgentBudgetState, AgentPolicy, AuditEvent, IdempotencyRecord, Merchant, PaymentOrder, PolicyEvaluation, ProviderPayment, RiskDecision, RiskPrediction, Transaction, WebhookEvent
+from agentshield_api.models import (
+    Agent,
+    AgentBudgetState,
+    AgentPolicy,
+    AuditEvent,
+    IdempotencyRecord,
+    Investigation,
+    Merchant,
+    ModelVersion,
+    PaymentOrder,
+    PolicyEvaluation,
+    ProviderPayment,
+    Review,
+    RiskDecision,
+    RiskPrediction,
+    Transaction,
+    WebhookEvent,
+)
 from agentshield_api.payment_contracts import PaymentOrderRequest, PaymentOrderResponse
 from agentshield_api.rate_limit import rate_limiter
-from agentshield_api.risk import PolicyContext, RiskAssessment, classify_score, decide, evaluate_policy
 from agentshield_api.razorpay import PaymentProviderError, RazorpayTestProvider, verify_webhook_signature
+from agentshield_api.risk import PolicyContext, RiskAssessment, classify_score, decide, evaluate_policy
 from agentshield_api.security import authorize_agent
 
 app = FastAPI(title="AgentShield API", version="0.1.0", description="Defense-only AI risk and trust layer for agentic payments.")
@@ -102,6 +131,39 @@ async def settle_budget_reservation(session: AsyncSession, *, agent_id: UUID, am
         state.spent += amount
 
 
+def queue_select():
+    return (
+        select(Transaction, Agent, Merchant, RiskDecision)
+        .join(Agent, Agent.id == Transaction.agent_id)
+        .join(Merchant, Merchant.id == Transaction.merchant_id)
+        .join(RiskDecision, RiskDecision.transaction_id == Transaction.id)
+    )
+
+
+def queue_item(transaction: Transaction, agent: Agent, merchant: Merchant, decision: RiskDecision) -> RiskQueueItem:
+    return RiskQueueItem(
+        transaction_id=transaction.id,
+        agent_id=agent.id,
+        agent_name=agent.name,
+        merchant_id=merchant.id,
+        merchant_name=merchant.name,
+        amount=transaction.amount,
+        currency=transaction.currency,
+        status=transaction.status,
+        risk_score=decision.risk_score,
+        risk_band=decision.risk_band,
+        decision=decision.decision,
+        model_version=decision.model_version,
+        policy_version=decision.policy_version,
+        reason_codes=list(decision.reason_codes or []),
+        occurred_at=transaction.occurred_at,
+    )
+
+
+def audit_item(row: AuditEvent) -> AuditItem:
+    return AuditItem(id=row.id, transaction_id=row.transaction_id, event_type=row.event_type, actor_type=row.actor_type, actor_id=row.actor_id, payload=row.payload or {}, occurred_at=row.occurred_at)
+
+
 @app.get("/health/live", tags=["health"])
 def live() -> dict[str, str]:
     return {"status": "ok"}
@@ -169,6 +231,100 @@ async def evaluate_risk(request: RiskEvaluateRequest, session: AsyncSession = De
     return response
 
 
+@app.get("/api/v1/risk/transactions", response_model=RiskQueueResponse, tags=["risk"])
+async def list_risk_transactions(limit: int = 25, offset: int = 0, decision: str | None = None, risk_band: str | None = None, session: AsyncSession = Depends(get_session)) -> RiskQueueResponse:
+    limit = min(max(limit, 1), 100)
+    offset = max(offset, 0)
+    base = queue_select()
+    count_stmt = select(func.count()).select_from(Transaction).join(RiskDecision, RiskDecision.transaction_id == Transaction.id)
+    if decision:
+        base = base.where(RiskDecision.decision == decision.upper())
+        count_stmt = count_stmt.where(RiskDecision.decision == decision.upper())
+    if risk_band:
+        base = base.where(RiskDecision.risk_band == risk_band.upper())
+        count_stmt = count_stmt.where(RiskDecision.risk_band == risk_band.upper())
+    total = int(await session.scalar(count_stmt) or 0)
+    rows = (await session.execute(base.order_by(Transaction.occurred_at.desc()).limit(limit).offset(offset))).all()
+    return RiskQueueResponse(items=[queue_item(t, a, m, d) for t, a, m, d in rows], total=total, limit=limit, offset=offset)
+
+
+@app.get("/api/v1/risk/transactions/{transaction_id}", response_model=TransactionDetailResponse, tags=["risk"])
+async def get_risk_transaction(transaction_id: UUID, session: AsyncSession = Depends(get_session)) -> TransactionDetailResponse:
+    row = (await session.execute(queue_select().where(Transaction.id == transaction_id))).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="transaction_not_found")
+    transaction, agent, merchant, decision = row
+    prediction = await session.scalar(select(RiskPrediction).where(RiskPrediction.transaction_id == transaction_id).order_by(RiskPrediction.created_at.desc()))
+    policy_eval = await session.scalar(select(PolicyEvaluation).where(PolicyEvaluation.transaction_id == transaction_id).order_by(PolicyEvaluation.evaluated_at.desc()))
+    reviews = (await session.scalars(select(Review).where(Review.transaction_id == transaction_id).order_by(Review.created_at.desc()))).all()
+    audits = (await session.scalars(select(AuditEvent).where(AuditEvent.transaction_id == transaction_id).order_by(AuditEvent.occurred_at.asc()))).all()
+    investigation = await session.scalar(select(Investigation).where(Investigation.transaction_id == transaction_id))
+    payment_order = await session.scalar(select(PaymentOrder).where(PaymentOrder.transaction_id == transaction_id))
+    provider_payment = None
+    if payment_order is not None:
+        provider_payment = await session.scalar(select(ProviderPayment).where(ProviderPayment.payment_order_id == payment_order.id).order_by(ProviderPayment.created_at.desc()))
+    return TransactionDetailResponse(
+        transaction=queue_item(transaction, agent, merchant, decision),
+        prediction=None if prediction is None else {"model_version": prediction.model_version, "score": str(prediction.score), "risk_band": prediction.risk_band, "signals": prediction.signals, "created_at": prediction.created_at.isoformat()},
+        policy_evaluation=None if policy_eval is None else {"policy_version": policy_eval.policy_version, "result": policy_eval.result, "violations": policy_eval.violations, "evaluated_at": policy_eval.evaluated_at.isoformat()},
+        decision_record={"decision": decision.decision, "risk_score": str(decision.risk_score), "risk_band": decision.risk_band, "model_version": decision.model_version, "policy_version": decision.policy_version, "reason_codes": decision.reason_codes},
+        reviews=[ReviewResponse(id=r.id, transaction_id=r.transaction_id, reviewer_id=r.reviewer_id, outcome=r.outcome, note=r.note, created_at=r.created_at) for r in reviews],
+        audit_events=[audit_item(a) for a in audits],
+        investigation=None if investigation is None else {"status": investigation.status, "prompt_version": investigation.prompt_version, "evidence_hash": investigation.evidence_hash, "result": investigation.result},
+        payment_order=None if payment_order is None else {"provider": payment_order.provider, "provider_order_id": payment_order.provider_order_id, "state": payment_order.state, "amount_minor": payment_order.amount_minor, "currency": payment_order.currency},
+        provider_payment=None if provider_payment is None else {"provider_payment_id": provider_payment.provider_payment_id, "state": provider_payment.state, "raw_event": provider_payment.raw_event},
+    )
+
+
+@app.post("/api/v1/risk/transactions/{transaction_id}/review", response_model=ReviewResponse, status_code=201, tags=["risk"])
+async def review_risk_transaction(transaction_id: UUID, request: ReviewCreateRequest, session: AsyncSession = Depends(get_session)) -> ReviewResponse:
+    transaction = await session.scalar(select(Transaction).where(Transaction.id == transaction_id))
+    decision = await session.scalar(select(RiskDecision).where(RiskDecision.transaction_id == transaction_id))
+    if transaction is None or decision is None:
+        raise HTTPException(status_code=404, detail="transaction_not_found")
+    review = Review(id=uuid4(), transaction_id=transaction_id, reviewer_id=request.reviewer_id, outcome=request.outcome, note=request.note)
+    session.add(review)
+    session.add(AuditEvent(id=uuid4(), transaction_id=transaction_id, event_type="RISK_REVIEW_RECORDED", actor_type="REVIEWER", actor_id=request.reviewer_id, payload={"outcome": request.outcome, "note": request.note}))
+    await session.commit()
+    await session.refresh(review)
+    return ReviewResponse(id=review.id, transaction_id=review.transaction_id, reviewer_id=review.reviewer_id, outcome=review.outcome, note=review.note, created_at=review.created_at)
+
+
+@app.get("/api/v1/policies", response_model=list[PolicyItem], tags=["policies"])
+async def list_policies(agent_id: UUID | None = None, session: AsyncSession = Depends(get_session)) -> list[PolicyItem]:
+    stmt = select(AgentPolicy).order_by(AgentPolicy.agent_id, AgentPolicy.version.desc())
+    if agent_id is not None:
+        stmt = stmt.where(AgentPolicy.agent_id == agent_id)
+    rows = (await session.scalars(stmt)).all()
+    return [PolicyItem(id=p.id, agent_id=p.agent_id, version=p.version, is_active=p.is_active, rules=p.rules, created_at=p.created_at) for p in rows]
+
+
+@app.get("/api/v1/models", response_model=list[ModelItem], tags=["models"])
+async def list_models(session: AsyncSession = Depends(get_session)) -> list[ModelItem]:
+    rows = (await session.scalars(select(ModelVersion).order_by(ModelVersion.created_at.desc()))).all()
+    return [ModelItem(version=m.version, status=m.status, artifact_sha256=m.artifact_sha256, metrics=m.metrics, training_config=m.training_config, created_at=m.created_at) for m in rows]
+
+
+@app.get("/api/v1/audit", response_model=list[AuditItem], tags=["audit"])
+async def list_audit(limit: int = 100, transaction_id: UUID | None = None, session: AsyncSession = Depends(get_session)) -> list[AuditItem]:
+    limit = min(max(limit, 1), 250)
+    stmt = select(AuditEvent).order_by(AuditEvent.occurred_at.desc()).limit(limit)
+    if transaction_id is not None:
+        stmt = stmt.where(AuditEvent.transaction_id == transaction_id)
+    rows = (await session.scalars(stmt)).all()
+    return [audit_item(row) for row in rows]
+
+
+@app.get("/api/v1/risk/metrics", response_model=RiskMetricsResponse, tags=["risk"])
+async def risk_metrics(session: AsyncSession = Depends(get_session)) -> RiskMetricsResponse:
+    total = int(await session.scalar(select(func.count()).select_from(RiskDecision)) or 0)
+    blocked = int(await session.scalar(select(func.count()).select_from(RiskDecision).where(RiskDecision.decision == "BLOCK")) or 0)
+    verify = int(await session.scalar(select(func.count()).select_from(RiskDecision).where(RiskDecision.decision == "VERIFY")) or 0)
+    allowed = int(await session.scalar(select(func.count()).select_from(RiskDecision).where(RiskDecision.decision == "ALLOW")) or 0)
+    high = int(await session.scalar(select(func.count()).select_from(RiskDecision).where(RiskDecision.risk_band == "HIGH")) or 0)
+    return RiskMetricsResponse(evaluations=total, high_risk=high, verification=verify, blocked=blocked, allowed=allowed)
+
+
 @app.post("/api/v1/payments/orders", response_model=PaymentOrderResponse, tags=["payments"])
 async def create_payment_order(request: PaymentOrderRequest, session: AsyncSession = Depends(get_session)) -> PaymentOrderResponse:
     scope = "payment:order"
@@ -178,7 +334,6 @@ async def create_payment_order(request: PaymentOrderRequest, session: AsyncSessi
         await session.rollback()
         return PaymentOrderResponse.model_validate(replay)
     await create_idempotency_claim(session, scope=scope, key=request.idempotency_key, request_hash_value=req_hash)
-
     transaction = await session.scalar(select(Transaction).where(Transaction.id == request.transaction_id))
     decision = await session.scalar(select(RiskDecision).where(RiskDecision.transaction_id == request.transaction_id))
     if transaction is None or decision is None:
@@ -194,7 +349,6 @@ async def create_payment_order(request: PaymentOrderRequest, session: AsyncSessi
     daily_limit = Decimal(str((policy.rules or {}).get("daily_limit", settings.daily_limit_default)))
     period_key = transaction.occurred_at.astimezone(timezone.utc).date().isoformat()
     await reserve_agent_budget(session, agent_id=transaction.agent_id, amount=transaction.amount, daily_limit=daily_limit, period_key=period_key)
-
     if not settings.razorpay_key_id or not settings.razorpay_key_secret:
         await session.rollback()
         raise HTTPException(status_code=503, detail="razorpay_test_mode_not_configured")
@@ -204,7 +358,6 @@ async def create_payment_order(request: PaymentOrderRequest, session: AsyncSessi
     except PaymentProviderError as exc:
         await session.rollback()
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-
     session.add(PaymentOrder(id=uuid4(), transaction_id=transaction.id, provider=order.provider, provider_order_id=order.order_id, state=order.state, amount_minor=order.amount_minor, currency=order.currency))
     await settle_budget_reservation(session, agent_id=transaction.agent_id, amount=transaction.amount, period_key=period_key, success=True)
     session.add(AuditEvent(id=uuid4(), transaction_id=transaction.id, event_type="PAYMENT_ORDER_CREATED", actor_type="SYSTEM", actor_id=None, payload={"provider": order.provider, "provider_order_id": order.order_id, "state": order.state, "test_mode": True}))
