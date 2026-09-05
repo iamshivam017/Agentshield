@@ -32,12 +32,14 @@ def authorize_agent(
     x_agent_id: UUID | None = None,
 ) -> None:
     """Authenticate and bind a caller to the requested agent."""
-    if settings.require_agent_auth and not settings.agent_api_key:
+    protected_environment = settings.app_env.lower() in {"production", "staging"}
+    auth_required = settings.require_agent_auth or protected_environment
+    if auth_required and not settings.agent_api_key:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="agent_auth_not_configured",
         )
-    if not settings.require_agent_auth:
+    if not auth_required:
         return
     if x_agent_api_key is None or not compare_digest(x_agent_api_key, settings.agent_api_key or ""):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_agent_credentials")
