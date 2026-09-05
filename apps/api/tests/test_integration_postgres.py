@@ -6,7 +6,8 @@ from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
+from sqlalchemy.exc import IntegrityError
 
 from agentshield_api.db import SessionLocal
 from agentshield_api.models import Agent, AgentPolicy, Merchant, Transaction, TransactionFeature
@@ -95,4 +96,30 @@ async def test_risk_evaluate_persists_and_replays_idempotently() -> None:
         await session.execute(delete(Transaction).where(Transaction.id == transaction.id))
         await session.execute(delete(Agent).where(Agent.id == agent_id))
         await session.execute(delete(Merchant).where(Merchant.id == merchant_id))
+        await session.commit()
+
+
+async def test_policy_versions_are_immutable_and_only_one_can_be_active() -> None:
+    agent_id = uuid4()
+    first_policy_id = uuid4()
+    second_policy_id = uuid4()
+    async with SessionLocal() as session:
+        session.add(Agent(id=agent_id, name="Policy Integrity Agent", status="ACTIVE"))
+        session.add(AgentPolicy(id=first_policy_id, agent_id=agent_id, version=1, is_active=True, rules={"transaction_limit": "100"}))
+        await session.commit()
+
+        session.add(AgentPolicy(id=second_policy_id, agent_id=agent_id, version=2, is_active=True, rules={"transaction_limit": "200"}))
+        with pytest.raises(IntegrityError):
+            await session.flush()
+        await session.rollback()
+
+        policy = await session.get(AgentPolicy, first_policy_id)
+        assert policy is not None
+        policy.rules = {"transaction_limit": "999"}
+        with pytest.raises(Exception, match="immutable"):
+            await session.flush()
+        await session.rollback()
+
+        await session.execute(text("DELETE FROM agent_policies WHERE id = :id"), {"id": str(first_policy_id)})
+        await session.execute(delete(Agent).where(Agent.id == agent_id))
         await session.commit()
