@@ -12,7 +12,7 @@
 - [x] Local PostgreSQL + Redis development stack
 - [x] API container definition
 - [x] Web standalone container definition
-- [ ] CI workflow
+- [x] CI workflow
 
 ### M14.1 — Application Scaffold
 
@@ -138,4 +138,4 @@
 
 M15.1 — Live PostgreSQL migration + persistence integration verification, then M16 runtime model training/validation and M17 runtime API integration tests.
 
-The Command Center now consumes the risk metrics, paginated queue, transaction detail, review, and audit APIs instead of presenting hardcoded production-looking statistics. The remaining UI areas are intentionally still marked as not implemented until their corresponding backend workflows and verification coverage exist.
+The Command Center now consumes the risk metrics, paginated queue, transaction detail, review, and audit APIs instead of presenting hardcoded production-looking statistics. CI is now defined for API lint/type/test/security, web lint/type/build/security, and container builds; actual workflow success remains a runtime verification step rather than an assumed result.
