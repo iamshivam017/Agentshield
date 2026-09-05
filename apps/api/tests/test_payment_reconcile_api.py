@@ -23,7 +23,7 @@ async def test_mock_payment_reconciliation_updates_state_and_audit(monkeypatch: 
     merchant_id = uuid4()
     transaction_id = uuid4()
     payment_order_id = uuid4()
-    provider_order_id = f"order_mock_1"
+    provider_order_id = "order_mock_1"
 
     async with SessionLocal() as session:
         session.add(Agent(id=agent_id, name="Reconcile Agent", status="ACTIVE"))
