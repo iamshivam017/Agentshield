@@ -28,6 +28,10 @@ async def test_concurrent_payment_orders_do_not_exceed_daily_budget(monkeypatch:
     provider = MockPaymentProvider()
 
     class FakeRazorpayProvider:
+        def __init__(self, *, key_id: str, key_secret: str) -> None:
+            self.key_id = key_id
+            self.key_secret = key_secret
+
         async def create_order(self, *, amount: Decimal, currency: str, receipt: str):
             return await provider.create_order(amount=amount, currency=currency, receipt=receipt)
 
