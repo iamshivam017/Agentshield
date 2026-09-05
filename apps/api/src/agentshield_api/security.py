@@ -7,6 +7,7 @@ from typing import Iterable
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from fastapi.responses import JSONResponse
 from starlette.requests import Request
 from starlette.responses import Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -121,15 +122,34 @@ def _required_roles(path: str, method: str) -> set[str] | None:
     return None
 
 
+def _auth_error_response(request: Request, exc: HTTPException) -> JSONResponse:
+    request_id = request.headers.get("X-Request-ID") or "unknown"
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": {
+                "code": str(exc.detail).upper(),
+                "message": str(exc.detail),
+                "request_id": request_id,
+            }
+        },
+        headers={"X-Request-ID": request_id, **dict(exc.headers or {})},
+    )
+
+
 class ControlPlaneAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         allowed_roles = _required_roles(request.url.path, request.method)
         if allowed_roles is not None:
-            principal = require_operator(
-                request.headers.get("X-Operator-API-Key"),
-                request.headers.get("X-Operator-ID"),
-                allowed_roles,
-            )
+            try:
+                principal = require_operator(
+                    request.headers.get("X-Operator-API-Key"),
+                    request.headers.get("X-Operator-ID"),
+                    allowed_roles,
+                )
+            except HTTPException as exc:
+                return _auth_error_response(request, exc)
+
             request.state.operator = principal
 
             if request.url.path.endswith("/review") and request.method == "POST":
@@ -137,10 +157,16 @@ class ControlPlaneAuthMiddleware(BaseHTTPMiddleware):
                     body = await request.body()
                     payload = json.loads(body)
                 except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-                    raise HTTPException(status_code=400, detail="invalid_review_payload") from exc
+                    return _auth_error_response(
+                        request,
+                        HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid_review_payload"),
+                    )
                 supplied_reviewer = payload.get("reviewer_id")
                 if supplied_reviewer != principal.operator_id:
-                    raise HTTPException(status_code=403, detail="reviewer_identity_mismatch")
+                    return _auth_error_response(
+                        request,
+                        HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="reviewer_identity_mismatch"),
+                    )
 
         return await call_next(request)
 
