@@ -11,7 +11,7 @@ def test_alembic_has_single_head() -> None:
     scripts = ScriptDirectory.from_config(config)
 
     heads = scripts.get_heads()
-    assert heads == ["0006_single_active_model"]
+    assert heads == ["0007_terminal_capture_immutable"]
 
 
 def test_migration_chain_is_linear() -> None:
@@ -21,6 +21,7 @@ def test_migration_chain_is_linear() -> None:
     scripts = ScriptDirectory.from_config(config)
 
     expected_chain = {
+        "0007_terminal_capture_immutable": "0006_single_active_model",
         "0006_single_active_model": "0005_payment_state_monotonic",
         "0005_payment_state_monotonic": "0004_payment_state_integrity",
         "0004_payment_state_integrity": "0003_policy_immutability",
