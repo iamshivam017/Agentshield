@@ -25,8 +25,8 @@ def test_request_fingerprint_ignores_idempotency_key() -> None:
         "category": "software",
         "occurred_at": "2026-09-05T10:00:00Z",
     }
-    first = RiskEvaluateRequest(**payload, idempotency_key="key-one")
-    second = RiskEvaluateRequest(**payload, idempotency_key="key-two")
+    first = RiskEvaluateRequest(**payload, idempotency_key="key-one-1")
+    second = RiskEvaluateRequest(**payload, idempotency_key="key-two-2")
     assert canonical_business_fingerprint(first) == canonical_business_fingerprint(second)
 
 
@@ -39,8 +39,8 @@ def test_request_fingerprint_changes_for_business_request() -> None:
         "category": "software",
         "occurred_at": "2026-09-05T10:00:00Z",
     }
-    first = RiskEvaluateRequest(**common, amount="100.00", idempotency_key="key-one")
-    second = RiskEvaluateRequest(**common, amount="101.00", idempotency_key="key-one")
+    first = RiskEvaluateRequest(**common, amount="100.00", idempotency_key="key-one-1")
+    second = RiskEvaluateRequest(**common, amount="101.00", idempotency_key="key-one-1")
     assert canonical_business_fingerprint(first) != canonical_business_fingerprint(second)
 
 
