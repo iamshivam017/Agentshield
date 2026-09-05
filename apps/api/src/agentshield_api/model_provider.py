@@ -19,8 +19,20 @@ class ModelUnavailable(RuntimeError):
 class RiskModel(Protocol):
     version: str
 
-    def predict(self, *, features: dict[str, float], category: str) -> tuple[Decimal, list[str]]:
+    def predict(
+        self,
+        *,
+        features: dict[str, float] | None = None,
+        amount: Decimal | None = None,
+        category: str,
+    ) -> tuple[Decimal, list[str]]:
         ...
+
+
+def _fallback_features(*, amount: Decimal | None) -> dict[str, float]:
+    values = {name: 0.0 for name in FEATURE_NAMES}
+    values["amount"] = float(amount or Decimal("0"))
+    return values
 
 
 class DevelopmentHeuristicModel:
@@ -28,17 +40,24 @@ class DevelopmentHeuristicModel:
 
     version = "dev-heuristic-0"
 
-    def predict(self, *, features: dict[str, float], category: str) -> tuple[Decimal, list[str]]:
-        amount = Decimal(str(features["amount"]))
-        score = min(Decimal("0.95"), amount / Decimal("10000"))
+    def predict(
+        self,
+        *,
+        features: dict[str, float] | None = None,
+        amount: Decimal | None = None,
+        category: str,
+    ) -> tuple[Decimal, list[str]]:
+        values = features or _fallback_features(amount=amount)
+        amount_value = Decimal(str(values["amount"]))
+        score = min(Decimal("0.95"), amount_value / Decimal("10000"))
         signals: list[str] = []
-        if amount >= Decimal("5000"):
+        if amount_value >= Decimal("5000"):
             signals.append("AMOUNT_ELEVATED")
-        if features["new_device"]:
+        if values["new_device"]:
             signals.append("NEW_DEVICE")
-        if features["new_merchant"]:
+        if values["new_merchant"]:
             signals.append("NEW_MERCHANT")
-        if features["burst"]:
+        if values["burst"]:
             score = min(Decimal("0.95"), score + Decimal("0.15"))
             signals.append("VELOCITY_SPIKE")
         if category.lower() in {"crypto", "gambling"}:
@@ -69,19 +88,26 @@ class VerifiedArtifactModel:
         self.version = version
         self.artifact_sha256 = actual
 
-    def predict(self, *, features: dict[str, float], category: str) -> tuple[Decimal, list[str]]:
-        matrix = np.asarray([[features[name] for name in self._feature_names]], dtype=float)
+    def predict(
+        self,
+        *,
+        features: dict[str, float] | None = None,
+        amount: Decimal | None = None,
+        category: str,
+    ) -> tuple[Decimal, list[str]]:
+        values = features or _fallback_features(amount=amount)
+        matrix = np.asarray([[values[name] for name in self._feature_names]], dtype=float)
         try:
             probability = float(self._model.predict_proba(matrix)[0][1])
         except Exception as exc:  # noqa: BLE001 - model implementation is provider-specific
             raise ModelUnavailable("risk model prediction failed") from exc
         score = Decimal(str(min(max(probability, 0.0), 1.0))).quantize(Decimal("0.000001"))
         signals = ["MODEL_ARTIFACT_VERIFIED"]
-        if features["new_device"]:
+        if values["new_device"]:
             signals.append("NEW_DEVICE")
-        if features["new_merchant"]:
+        if values["new_merchant"]:
             signals.append("NEW_MERCHANT")
-        if features["burst"]:
+        if values["burst"]:
             signals.append("VELOCITY_SPIKE")
         if category.lower() in {"crypto", "gambling"}:
             signals.append("CATEGORY_ELEVATED")
