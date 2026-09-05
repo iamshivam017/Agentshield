@@ -1,0 +1,23 @@
+.error-banner{margin:0 0 20px;padding:14px 16px;border:1px solid rgba(180,70,70,.35);border-radius:12px;background:rgba(180,70,70,.08)}
+.empty-state{text-align:center;padding:36px!important;color:var(--muted,#7a7f8c)}
+tbody tr{cursor:pointer}tbody tr:focus{outline:2px solid currentColor;outline-offset:-2px}
+.scenario-note{margin-top:14px;font-size:12px;line-height:1.5}
+.investigation-layout{display:grid;gap:18px}
+.investigation-hero{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;padding:24px}
+.investigation-hero h2{margin:6px 0 8px;font-size:28px;letter-spacing:-.03em}
+.investigation-hero p{margin:0;color:var(--muted,#7a7f8c)}
+.investigation-decision{min-width:150px;padding:14px 16px;border:1px solid rgba(127,127,127,.18);border-radius:14px;display:grid;justify-items:end;gap:4px}
+.investigation-decision strong{font:700 30px/1 var(--mono-font,monospace)}
+.investigation-decision small{text-transform:uppercase;font-size:10px;letter-spacing:.12em;color:var(--muted,#7a7f8c)}
+.investigation-grid{display:grid;grid-template-columns:1.35fr .85fr;gap:18px}
+.evidence-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:0 18px 16px}
+.evidence-card{padding:14px;border:1px solid rgba(127,127,127,.15);border-radius:12px;display:grid;gap:5px}
+.evidence-card span,.evidence-card small{font-size:10px;text-transform:uppercase;letter-spacing:.11em;color:var(--muted,#7a7f8c)}
+.evidence-card strong{font-size:14px}
+.signal-list{display:flex;flex-wrap:wrap;gap:8px;padding:0 18px 18px}
+.evidence-chip{padding:7px 9px;border-radius:999px;background:rgba(127,127,127,.08);font:500 11px var(--mono-font,monospace)}
+.kv-list{display:grid;padding:4px 18px 18px}.kv-list>div{display:flex;justify-content:space-between;gap:20px;padding:13px 0;border-bottom:1px solid rgba(127,127,127,.12)}.kv-list span{color:var(--muted,#7a7f8c)}.kv-list b{text-align:right;max-width:68%;word-break:break-word}
+.review-panel{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px}.review-panel h2{margin:4px 0}.review-panel p{margin:0}.review-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.timeline{display:grid;padding:2px 18px 18px}.timeline-row{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid rgba(127,127,127,.12)}.timeline-row>div{display:grid;gap:4px}.timeline-row small{color:var(--muted,#7a7f8c)}
+@media (max-width:900px){.investigation-grid{grid-template-columns:1fr}.investigation-hero,.review-panel{flex-direction:column}.investigation-decision{width:100%;justify-items:start}.review-actions{width:100%;justify-content:flex-start}}
+@media (max-width:620px){.evidence-grid{grid-template-columns:1fr}}
