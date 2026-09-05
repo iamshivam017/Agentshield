@@ -8,6 +8,8 @@ from typing import Protocol
 
 import httpx
 
+from app.payment_state import PaymentState
+
 
 class PaymentProviderError(RuntimeError):
     """Raised when the payment provider cannot safely complete an operation."""
@@ -22,9 +24,21 @@ class OrderResult:
     state: str
 
 
+@dataclass(frozen=True)
+class ReconciliationResult:
+    provider: str
+    order_id: str
+    state: str
+    provider_payment_id: str | None = None
+    payment_state: str | None = None
+
+
 class PaymentProvider(Protocol):
     async def create_order(self, *, amount: Decimal, currency: str, receipt: str) -> OrderResult:
         """Create an external order without claiming that payment completed."""
+
+    async def reconcile_order(self, *, order_id: str) -> ReconciliationResult:
+        """Read provider state and return the authoritative state observed now."""
 
 
 def amount_to_minor(amount: Decimal, *, currency: str) -> int:
@@ -43,6 +57,7 @@ class MockPaymentProvider:
     order_prefix: str = "order_mock_"
     calls: int = 0
     fail: bool = False
+    reconciled_state: str = PaymentState.PAYMENT_PENDING.value
 
     async def create_order(self, *, amount: Decimal, currency: str, receipt: str) -> OrderResult:
         if self.fail:
@@ -57,7 +72,24 @@ class MockPaymentProvider:
             order_id=f"{self.order_prefix}{self.calls}",
             amount_minor=minor,
             currency=currency,
-            state="ORDER_CREATED",
+            state=PaymentState.ORDER_CREATED.value,
+        )
+
+    async def reconcile_order(self, *, order_id: str) -> ReconciliationResult:
+        if self.fail:
+            raise PaymentProviderError("mock_provider_failure")
+        if not order_id:
+            raise PaymentProviderError("provider_order_id_required")
+        return ReconciliationResult(
+            provider=self.provider,
+            order_id=order_id,
+            state=self.reconciled_state,
+            provider_payment_id=f"pay_mock_{order_id.removeprefix(self.order_prefix)}"
+            if self.reconciled_state != PaymentState.ORDER_CREATED.value
+            else None,
+            payment_state=self.reconciled_state
+            if self.reconciled_state != PaymentState.ORDER_CREATED.value
+            else None,
         )
 
 
@@ -116,8 +148,32 @@ class RazorpayTestProvider:
             order_id=order_id,
             amount_minor=minor,
             currency=currency,
-            state="ORDER_CREATED",
+            state=PaymentState.ORDER_CREATED.value,
         )
+
+    async def reconcile_order(self, *, order_id: str) -> ReconciliationResult:
+        if not order_id:
+            raise PaymentProviderError("provider_order_id_required")
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                response = await client.get(
+                    f"{self.BASE_URL}/orders/{order_id}",
+                    auth=(self._key_id, self._key_secret),
+                )
+        except httpx.HTTPError as exc:
+            raise PaymentProviderError("Razorpay reconciliation request failed") from exc
+
+        if response.status_code >= 400:
+            raise PaymentProviderError(f"Razorpay reconciliation failed with HTTP {response.status_code}")
+
+        data = response.json()
+        status_value = str(data.get("status", "")).lower()
+        state = {
+            "created": PaymentState.ORDER_CREATED.value,
+            "attempted": PaymentState.PAYMENT_PENDING.value,
+            "paid": PaymentState.PAYMENT_CAPTURED.value,
+        }.get(status_value, PaymentState.PAYMENT_UNKNOWN.value)
+        return ReconciliationResult(provider="razorpay", order_id=order_id, state=state)
 
 
 def verify_webhook_signature(*, raw_body: bytes, received_signature: str, secret: str) -> bool:
