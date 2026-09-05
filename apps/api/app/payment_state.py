@@ -16,8 +16,8 @@ _ALLOWED_TRANSITIONS: dict[PaymentState, frozenset[PaymentState]] = {
     PaymentState.ORDER_CREATED: frozenset({PaymentState.PAYMENT_PENDING, PaymentState.PAYMENT_AUTHORIZED, PaymentState.PAYMENT_CAPTURED, PaymentState.PAYMENT_FAILED, PaymentState.PAYMENT_UNKNOWN}),
     PaymentState.PAYMENT_PENDING: frozenset({PaymentState.PAYMENT_AUTHORIZED, PaymentState.PAYMENT_CAPTURED, PaymentState.PAYMENT_FAILED, PaymentState.PAYMENT_UNKNOWN}),
     PaymentState.PAYMENT_AUTHORIZED: frozenset({PaymentState.PAYMENT_CAPTURED, PaymentState.PAYMENT_FAILED, PaymentState.PAYMENT_UNKNOWN}),
-    PaymentState.PAYMENT_CAPTURED: frozenset({PaymentState.PAYMENT_CAPTURED, PaymentState.PAYMENT_UNKNOWN}),
-    PaymentState.PAYMENT_FAILED: frozenset({PaymentState.PAYMENT_FAILED, PaymentState.PAYMENT_UNKNOWN, PaymentState.PAYMENT_AUTHORIZED, PaymentState.PAYMENT_CAPTURED}),
+    PaymentState.PAYMENT_CAPTURED: frozenset({PaymentState.PAYMENT_CAPTURED}),
+    PaymentState.PAYMENT_FAILED: frozenset({PaymentState.PAYMENT_FAILED, PaymentState.PAYMENT_UNKNOWN, PaymentState.PAYMENT_CAPTURED}),
     PaymentState.PAYMENT_UNKNOWN: frozenset({
         PaymentState.PAYMENT_UNKNOWN,
         PaymentState.PAYMENT_PENDING,
@@ -25,6 +25,15 @@ _ALLOWED_TRANSITIONS: dict[PaymentState, frozenset[PaymentState]] = {
         PaymentState.PAYMENT_CAPTURED,
         PaymentState.PAYMENT_FAILED,
     }),
+}
+
+_STATE_RANK: dict[PaymentState, int] = {
+    PaymentState.PAYMENT_UNKNOWN: 0,
+    PaymentState.ORDER_CREATED: 1,
+    PaymentState.PAYMENT_PENDING: 2,
+    PaymentState.PAYMENT_AUTHORIZED: 3,
+    PaymentState.PAYMENT_FAILED: 4,
+    PaymentState.PAYMENT_CAPTURED: 5,
 }
 
 
@@ -45,10 +54,15 @@ def transition_state(current: str, target: str) -> str:
 
 
 def monotonic_state_update(current: str, incoming: str) -> str:
-    """Apply an observed state without allowing terminal capture to regress."""
-    if current == PaymentState.PAYMENT_CAPTURED.value and incoming != PaymentState.PAYMENT_CAPTURED.value:
-        return current
-    return transition_state(current, incoming)
+    """Apply the strongest observed state without allowing stale events to regress it."""
+    try:
+        current_state = PaymentState(current)
+        incoming_state = PaymentState(incoming)
+    except ValueError as exc:
+        raise ValueError(f"invalid_payment_state:{current}->{incoming}") from exc
+    if _STATE_RANK[incoming_state] < _STATE_RANK[current_state]:
+        return current_state.value
+    return transition_state(current_state.value, incoming_state.value)
 
 
 def razorpay_event_state(event_type: str | None) -> PaymentState:
