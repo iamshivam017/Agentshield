@@ -4,7 +4,7 @@ import hashlib
 import json
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,8 +24,8 @@ def _lock_key(agent_id: str) -> int:
 @router.post("", response_model=PolicyItem, status_code=status.HTTP_201_CREATED)
 async def create_policy(
     request: PolicyCreateRequest,
-    x_operator_api_key: str | None = Header(default=None),
-    x_operator_id: str | None = Header(default=None),
+    x_operator_api_key: str | None = None,
+    x_operator_id: str | None = None,
     session: AsyncSession = Depends(get_session),
 ) -> PolicyItem:
     operator_id = authorize_operator(x_operator_api_key, x_operator_id, {ROLE_ADMIN})
@@ -43,11 +43,7 @@ async def create_policy(
     next_version = 1 if latest is None else latest.version + 1
 
     if latest is not None and latest.is_active:
-        await session.execute(
-            update(AgentPolicy)
-            .where(AgentPolicy.id == latest.id)
-            .values(is_active=False)
-        )
+        await session.execute(update(AgentPolicy).where(AgentPolicy.id == latest.id).values(is_active=False))
 
     policy = AgentPolicy(
         id=uuid4(),
@@ -57,21 +53,11 @@ async def create_policy(
         rules=request.rules,
     )
     session.add(policy)
-    rules_hash = hashlib.sha256(
-        json.dumps(request.rules, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
+    rules_hash = hashlib.sha256(json.dumps(request.rules, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     session.add(
         AuditEvent(
-            id=uuid4(),
-            transaction_id=None,
-            event_type="POLICY_VERSION_CREATED",
-            actor_type="OPERATOR",
-            actor_id=operator_id,
-            payload={
-                "agent_id": str(request.agent_id),
-                "version": next_version,
-                "rules_hash": rules_hash,
-            },
+            id=uuid4(), transaction_id=None, event_type="POLICY_VERSION_CREATED", actor_type="OPERATOR", actor_id=operator_id,
+            payload={"agent_id": str(request.agent_id), "version": next_version, "rules_hash": rules_hash},
         )
     )
     try:
@@ -94,8 +80,10 @@ def register_policy_routes(app) -> None:
     app.include_router(router)
     from app.payment_routes import router as payment_router
     from app.investigation_routes import router as investigation_router
+    from app.model_routes import register_model_routes
     from agentshield_api.observability import install_observability
     app.include_router(payment_router)
     app.include_router(investigation_router)
+    register_model_routes(app)
     install_control_plane_security(app)
     install_observability(app)
