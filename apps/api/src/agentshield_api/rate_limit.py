@@ -48,7 +48,7 @@ class RedisRateStore:
     def check(self, key: str, limit: int, window_seconds: int) -> int:
         bucket = int(time() // window_seconds)
         redis_key = f"agentshield:rate:{window_seconds}:{bucket}:{key}"
-        result = self._client.eval(_REDIS_RATE_SCRIPT, 1, str(window_seconds))
+        result = self._client.eval(_REDIS_RATE_SCRIPT, 1, redis_key, str(window_seconds))
         return int(cast(str, result))
 
 
