@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     agent_api_key: str | None = None
     require_agent_auth: bool = False
     operator_api_key: str | None = None
+    operator_admin_api_key: str | None = None
+    operator_analyst_api_key: str | None = None
+    operator_viewer_api_key: str | None = None
     require_operator_auth: bool = False
     rate_limit_requests: int = 60
     rate_limit_window_seconds: int = 60
