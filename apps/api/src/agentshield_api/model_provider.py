@@ -9,6 +9,7 @@ import joblib  # type: ignore[import-untyped]
 import numpy as np
 
 from .config import settings
+from .features import FEATURE_NAMES
 
 
 class ModelUnavailable(RuntimeError):
@@ -18,7 +19,7 @@ class ModelUnavailable(RuntimeError):
 class RiskModel(Protocol):
     version: str
 
-    def predict(self, *, amount: Decimal, category: str) -> tuple[Decimal, list[str]]:
+    def predict(self, *, features: dict[str, float], category: str) -> tuple[Decimal, list[str]]:
         ...
 
 
@@ -27,11 +28,19 @@ class DevelopmentHeuristicModel:
 
     version = "dev-heuristic-0"
 
-    def predict(self, *, amount: Decimal, category: str) -> tuple[Decimal, list[str]]:
+    def predict(self, *, features: dict[str, float], category: str) -> tuple[Decimal, list[str]]:
+        amount = Decimal(str(features["amount"]))
         score = min(Decimal("0.95"), amount / Decimal("10000"))
         signals: list[str] = []
         if amount >= Decimal("5000"):
             signals.append("AMOUNT_ELEVATED")
+        if features["new_device"]:
+            signals.append("NEW_DEVICE")
+        if features["new_merchant"]:
+            signals.append("NEW_MERCHANT")
+        if features["burst"]:
+            score = min(Decimal("0.95"), score + Decimal("0.15"))
+            signals.append("VELOCITY_SPIKE")
         if category.lower() in {"crypto", "gambling"}:
             score = min(Decimal("0.95"), score + Decimal("0.20"))
             signals.append("CATEGORY_ELEVATED")
@@ -41,22 +50,7 @@ class DevelopmentHeuristicModel:
 class VerifiedArtifactModel:
     """Loads a trusted joblib classifier only after checksum verification."""
 
-    _feature_names = (
-        "amount",
-        "hour",
-        "is_weekend",
-        "new_device",
-        "new_merchant",
-        "auth_mismatch",
-        "burst",
-        "agent_tx_count_prior",
-        "user_tx_count_prior",
-        "device_tx_count_prior",
-        "merchant_tx_count_prior",
-        "agent_amount_mean_prior",
-        "user_amount_mean_prior",
-        "agent_count_1h_prior",
-    )
+    _feature_names = FEATURE_NAMES
 
     def __init__(self, *, path: str, expected_sha256: str, version: str) -> None:
         artifact = Path(path)
@@ -75,36 +69,20 @@ class VerifiedArtifactModel:
         self.version = version
         self.artifact_sha256 = actual
 
-    def predict(self, *, amount: Decimal, category: str) -> tuple[Decimal, list[str]]:
-        from datetime import datetime, timezone
-
-        now = datetime.now(timezone.utc)
-        # Until the request contract carries richer identity/history attributes,
-        # unknown historical dimensions are represented explicitly as zero rather
-        # than silently using post-event information.
-        values = {
-            "amount": float(amount),
-            "hour": float(now.hour),
-            "is_weekend": float(now.weekday() >= 5),
-            "new_device": 0.0,
-            "new_merchant": 0.0,
-            "auth_mismatch": 0.0,
-            "burst": 0.0,
-            "agent_tx_count_prior": 0.0,
-            "user_tx_count_prior": 0.0,
-            "device_tx_count_prior": 0.0,
-            "merchant_tx_count_prior": 0.0,
-            "agent_amount_mean_prior": 0.0,
-            "user_amount_mean_prior": 0.0,
-            "agent_count_1h_prior": 0.0,
-        }
-        matrix = np.asarray([[values[name] for name in self._feature_names]], dtype=float)
+    def predict(self, *, features: dict[str, float], category: str) -> tuple[Decimal, list[str]]:
+        matrix = np.asarray([[features[name] for name in self._feature_names]], dtype=float)
         try:
             probability = float(self._model.predict_proba(matrix)[0][1])
         except Exception as exc:  # noqa: BLE001 - model implementation is provider-specific
             raise ModelUnavailable("risk model prediction failed") from exc
         score = Decimal(str(min(max(probability, 0.0), 1.0))).quantize(Decimal("0.000001"))
         signals = ["MODEL_ARTIFACT_VERIFIED"]
+        if features["new_device"]:
+            signals.append("NEW_DEVICE")
+        if features["new_merchant"]:
+            signals.append("NEW_MERCHANT")
+        if features["burst"]:
+            signals.append("VELOCITY_SPIKE")
         if category.lower() in {"crypto", "gambling"}:
             signals.append("CATEGORY_ELEVATED")
         return score, signals
