@@ -50,8 +50,24 @@
 - [ ] Integration tests for transactions/concurrency/idempotency
 - [ ] Database backup/restore verification
 
+## M16 — Synthetic Dataset + Risk Model
+
+- [x] Reproducible synthetic transaction generator
+- [x] Legitimate hard-negative scenarios represented
+- [x] Leakage-safe point-in-time feature pipeline
+- [x] Chronological train/validation/frozen-test split
+- [x] Baseline logistic-risk model pipeline
+- [x] Precision/recall/F1/PR-AUC/ROC-AUC/confusion-matrix evaluation
+- [x] Validation threshold selection with FP/FN costs
+- [x] Model metadata/version/seed capture
+- [x] Automated ML unit tests
+- [ ] Runtime model training and measured validation/test metrics
+- [ ] Candidate XGBoost comparison
+- [ ] Calibration analysis
+- [ ] Model artifact SHA-256 registry record
+
 ## Next checkpoint
 
 M15.1 — Migration execution + persistence integration tests.
 
-The schema and ORM foundations are committed, and static migration/schema contract coverage is in place. Runtime verification still requires executing Alembic against PostgreSQL and exercising transaction, concurrency, idempotency, and failure behavior.
+ML scaffolding is implemented without claiming measured performance. Runtime database verification remains the immediate gate; after it passes, execute the ML training pipeline and record real held-out metrics before integrating the model into the risk API.
