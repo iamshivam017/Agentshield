@@ -9,6 +9,18 @@ from typing import Any, Protocol
 import httpx
 
 PROMPT_VERSION = "investigation-v1"
+_UNSAFE_ACTION_PHRASES = (
+    "override the decision",
+    "change the decision",
+    "replace the decision",
+    "ignore the decision",
+    "authorize payment",
+    "approve payment",
+    "decline payment",
+    "block payment",
+    "execute payment",
+    "issue refund",
+)
 
 
 @dataclass(frozen=True)
@@ -89,6 +101,22 @@ def _deterministic(*, evidence: list[EvidenceItem], authoritative_decision: str)
     )
 
 
+def _validate_llm_output(parsed: dict[str, Any], *, evidence: list[EvidenceItem], authoritative_decision: str) -> tuple[str, str, str, list[str]]:
+    summary = str(parsed["summary"])
+    assessment = str(parsed["assessment"])
+    recommended_action = str(parsed["recommended_action"])
+    cited = [str(item) for item in parsed.get("cited_evidence", [])]
+    valid_ids = {item.id for item in evidence}
+    if not cited or any(item not in valid_ids for item in cited):
+        raise ValueError("unsupported_evidence_citation")
+    if str(authoritative_decision) not in summary:
+        raise ValueError("decision_reference_missing")
+    combined = " ".join((summary, assessment, recommended_action)).lower()
+    if any(phrase in combined for phrase in _UNSAFE_ACTION_PHRASES):
+        raise ValueError("llm_authority_boundary_violation")
+    return summary, assessment, recommended_action, cited
+
+
 class ReadOnlyLLMProvider:
     """OpenAI-compatible, read-only explanation provider; never decides payment authority."""
 
@@ -135,17 +163,16 @@ class ReadOnlyLLMProvider:
                 data = response.json()
                 content = data["choices"][0]["message"]["content"]
                 parsed = json.loads(content)
-                cited = [str(item) for item in parsed.get("cited_evidence", [])]
-                valid_ids = {item.id for item in evidence}
-                if not cited or any(item not in valid_ids for item in cited):
-                    raise ValueError("unsupported_evidence_citation")
-                if str(authoritative_decision) not in str(parsed.get("summary", "")):
-                    raise ValueError("decision_reference_missing")
+                summary, assessment, recommended_action, cited = _validate_llm_output(
+                    parsed,
+                    evidence=evidence,
+                    authoritative_decision=authoritative_decision,
+                )
                 return InvestigationResult(
                     status="COMPLETED",
-                    summary=str(parsed["summary"]),
-                    assessment=str(parsed["assessment"]),
-                    recommended_action=str(parsed["recommended_action"]),
+                    summary=summary,
+                    assessment=assessment,
+                    recommended_action=recommended_action,
                     cited_evidence=cited,
                     evidence_hash=evidence_digest(evidence),
                     provider="llm",
