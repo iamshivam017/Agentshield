@@ -30,7 +30,7 @@ jobs:
       - name: Type-check API
         run: PYTHONPATH=apps/api/src:apps/api python -m mypy apps/api/app apps/api/src
       - name: Test API
-        run: PYTHONPATH=apps/api/src:apps/api pytest -q
+        run: PYTHONPATH=apps/api/src:apps/api pytest -q apps/api/tests
       - name: Dependency audit
         run: PYTHONPATH=apps/api/src:apps/api python -m pip_audit -r apps/api/requirements.txt
 
