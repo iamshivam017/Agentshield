@@ -122,7 +122,7 @@ test('loads the risk command center and completes an investigation review', asyn
   await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
   await expect(page.getByText('42', { exact: true })).toBeVisible();
   await expect(page.getByText('Procurement Agent')).toBeVisible();
-  await expect(page.getByText('ALLOW')).toBeVisible();
+  await expect(page.getByRole('table').getByText('ALLOW', { exact: true })).toBeVisible();
 
   await page.getByText(transactionId.slice(0, 8).toUpperCase(), { exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Investigations' })).toBeVisible();
