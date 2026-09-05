@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Build / coverage
+coverage/
+htmlcov/
+*.log
+
+# Data / ML artifacts
+ml/data/generated/
+ml/artifacts/
+ml/runs/
+*.joblib
+*.pkl
+*.onnx
+
+# Local infrastructure
+postgres-data/
+redis-data/
+
+# Temporary files
+tmp/
+tmp-*
