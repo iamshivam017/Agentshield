@@ -6,10 +6,10 @@ from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from agentshield_api.db import SessionLocal
-from agentshield_api.models import Agent, AgentPolicy, Merchant, Transaction
+from agentshield_api.models import Agent, AgentPolicy, Merchant, Transaction, TransactionFeature
 from app.main import app
 
 pytestmark = pytest.mark.asyncio
@@ -79,6 +79,16 @@ async def test_risk_evaluate_persists_and_replays_idempotently() -> None:
         transaction = await session.get(Transaction, first_body["transaction_id"])
         assert transaction is not None
         assert transaction.amount == Decimal("125.00")
+        feature = await session.scalar(
+            select(TransactionFeature).where(
+                TransactionFeature.transaction_id == transaction.id,
+                TransactionFeature.feature_version == "v1",
+            )
+        )
+        assert feature is not None
+        assert feature.values["amount"] == 125.0
+        assert feature.values["agent_tx_count_prior"] == 0.0
+        assert feature.values["device_tx_count_prior"] == 0.0
         await session.execute(delete(Agent).where(Agent.id == agent_id))
         await session.execute(delete(Merchant).where(Merchant.id == merchant_id))
         await session.commit()
