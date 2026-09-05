@@ -66,8 +66,30 @@
 - [ ] Calibration analysis
 - [ ] Model artifact SHA-256 registry record
 
+## M17 — Risk Decision API
+
+- [x] Request/response contract for `/api/v1/risk/evaluate`
+- [x] Risk band classification boundary
+- [x] Policy evaluation boundary
+- [x] Deterministic ALLOW/VERIFY/BLOCK decision boundary
+- [x] Versioned model-provider serving interface
+- [x] Development-only heuristic provider
+- [x] Agent/merchant/policy persistence lookup
+- [x] Risk prediction and decision persistence
+- [x] Hard policy violations override model outcome
+- [x] Production mode refuses service without an active model artifact
+- [x] Payment creation explicitly excluded from risk evaluation vertical slice
+- [x] Unit coverage for core decision invariants
+- [ ] Runtime API integration tests against PostgreSQL
+- [ ] Request authentication/authorization
+- [ ] Idempotency enforcement in endpoint
+- [ ] Transactional agent budget reservation
+- [ ] Trained model artifact integration
+- [ ] Structured API error envelope and request IDs
+- [ ] Rate limiting
+
 ## Next checkpoint
 
-M15.1 — Migration execution + persistence integration tests.
+M15.1 / M16 runtime verification, followed by completion of M17 production controls.
 
-ML scaffolding is implemented without claiming measured performance. Runtime database verification remains the immediate gate; after it passes, execute the ML training pipeline and record real held-out metrics before integrating the model into the risk API.
+The first end-to-end risk vertical slice is now wired: validate request → load agent/policy → score → evaluate policy → decide → persist prediction/decision. The provider integration is intentionally not performed by this endpoint, so ALLOW does not imply that a payment order was created.
