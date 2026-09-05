@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agentshield_api.config import settings
 from agentshield_api.db import get_session
 from agentshield_api.models import AuditEvent, PaymentOrder, ProviderPayment, Transaction
+from agentshield_api.observability import telemetry
 from app.payment_state import monotonic_state_update
 from app.razorpay import MockPaymentProvider, PaymentProviderError, RazorpayTestProvider
 
@@ -36,6 +37,7 @@ async def reconcile_payment_order(transaction_id: UUID, session: AsyncSession = 
     try:
         observed = await provider.reconcile_order(order_id=order.provider_order_id)
     except PaymentProviderError as exc:
+        telemetry.increment("payment_reconciliation_total", provider=order.provider, state="PROVIDER_ERROR")
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     next_order_state = monotonic_state_update(order.state, observed.state)
@@ -74,6 +76,7 @@ async def reconcile_payment_order(transaction_id: UUID, session: AsyncSession = 
         transaction.status = "PAYMENT_CAPTURED"
         changed = True
 
+    telemetry.increment("payment_reconciliation_total", provider=observed.provider, state=order.state)
     session.add(
         AuditEvent(
             id=uuid4(),
