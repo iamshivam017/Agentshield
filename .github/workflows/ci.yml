@@ -65,6 +65,15 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -99,8 +108,20 @@ jobs:
         env:
           DATABASE_URL: postgresql+psycopg://agentshield:agentshield@localhost:5432/agentshield
         run: PYTHONPATH=src alembic upgrade head
+      - name: Backup and restore drill
+        env:
+          SOURCE_DATABASE_URL: postgresql+psycopg://agentshield:agentshield@localhost:5432/agentshield
+          RESTORE_DATABASE_URL: postgresql+psycopg://agentshield:agentshield@localhost:5432/agentshield_restore
+          ALLOW_DESTRUCTIVE_RESTORE: '1'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          PGPASSWORD=agentshield createdb -h localhost -U agentshield agentshield_restore
+          bash scripts/backup_restore_smoke.sh
       - name: Test API
         env:
+          DATABASE_URL: postgresql+psycopg://agentshield:agentshield@localhost:5432/agentshield
+          REDIS_URL: redis://localhost:6379/0
           RISK_MODEL_ARTIFACT_PATH: /tmp/agentshield-model/model.joblib
           RISK_MODEL_METADATA_PATH: /tmp/agentshield-model/metadata.json
           RISK_MODEL_ARTIFACT_SHA256: ${{ steps.model.outputs.sha256 }}
