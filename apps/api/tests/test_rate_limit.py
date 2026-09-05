@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import os
+import uuid
+
 import pytest
 from fastapi import HTTPException
 
 from agentshield_api.config import settings
-from agentshield_api.rate_limit import InProcessRateLimiter, RateLimiter
+from agentshield_api.rate_limit import InProcessRateLimiter, RateLimiter, RedisRateStore
 
 
 class FakeRedisStore:
@@ -49,3 +52,18 @@ def test_protected_environment_fails_closed_without_redis(monkeypatch) -> None:
         limiter.check("caller")
     assert exc_info.value.status_code == 503
     assert exc_info.value.detail == "rate_limit_backend_unavailable"
+
+
+@pytest.mark.integration
+def test_live_redis_store_when_configured() -> None:
+    redis_url = os.getenv("REDIS_URL")
+    if not redis_url:
+        pytest.skip("REDIS_URL not configured")
+
+    store = RedisRateStore(redis_url)
+    key = f"integration-{uuid.uuid4()}"
+    first = store.check(key, limit=2, window_seconds=60)
+    second = store.check(key, limit=2, window_seconds=60)
+    third = store.check(key, limit=2, window_seconds=60)
+
+    assert (first, second, third) == (1, 2, 3)
