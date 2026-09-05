@@ -1,5 +1,3 @@
-from sqlalchemy import inspect
-
 from agentshield_api.models import Base
 
 
