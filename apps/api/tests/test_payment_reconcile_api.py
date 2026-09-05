@@ -84,3 +84,64 @@ async def test_mock_payment_reconciliation_updates_state_and_audit(monkeypatch: 
         await session.execute(delete(Merchant).where(Merchant.id == merchant_id))
         await session.execute(delete(Agent).where(Agent.id == agent_id))
         await session.commit()
+
+
+@pytest.mark.integration
+async def test_viewer_cannot_reconcile_payment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "require_operator_auth", True)
+    monkeypatch.setattr(settings, "operator_api_key", "legacy-admin-key")
+    monkeypatch.setattr(settings, "operator_analyst_api_key", "analyst-key")
+    monkeypatch.setattr(settings, "operator_viewer_api_key", "viewer-key")
+
+    agent_id = uuid4()
+    merchant_id = uuid4()
+    transaction_id = uuid4()
+    payment_order_id = uuid4()
+
+    async with SessionLocal() as session:
+        session.add(Agent(id=agent_id, name="Viewer Guard Agent", status="ACTIVE"))
+        session.add(Merchant(id=merchant_id, name="Viewer Guard Merchant", category="SOFTWARE"))
+        session.add(
+            Transaction(
+                id=transaction_id,
+                agent_id=agent_id,
+                merchant_id=merchant_id,
+                amount=Decimal("25.00"),
+                currency="INR",
+                device_id="viewer-device",
+                occurred_at="2026-09-05T11:00:00+00:00",
+                status="EVALUATED",
+            )
+        )
+        await session.flush()
+        session.add(
+            PaymentOrder(
+                id=payment_order_id,
+                transaction_id=transaction_id,
+                provider="mock",
+                provider_order_id=f"order_mock_{uuid4().hex}",
+                state="ORDER_CREATED",
+                amount_minor=2500,
+                currency="INR",
+            )
+        )
+        await session.commit()
+
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+            response = await client.post(
+                f"/api/v1/payments/orders/{transaction_id}/reconcile",
+                headers={
+                    "X-Operator-API-Key": "viewer-key",
+                    "X-Operator-ID": "risk-viewer",
+                },
+            )
+        assert response.status_code == 403
+        assert response.json()["error"]["code"] == "INSUFFICIENT_OPERATOR_ROLE"
+    finally:
+        async with SessionLocal() as session:
+            await session.execute(delete(PaymentOrder).where(PaymentOrder.id == payment_order_id))
+            await session.execute(delete(Transaction).where(Transaction.id == transaction_id))
+            await session.execute(delete(Merchant).where(Merchant.id == merchant_id))
+            await session.execute(delete(Agent).where(Agent.id == agent_id))
+            await session.commit()
