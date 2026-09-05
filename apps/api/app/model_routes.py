@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,17 +46,8 @@ async def _transition(version: str, target: str, *, operator_id: str | None, ses
     model.status = target
     session.add(
         AuditEvent(
-            id=uuid4(),
-            transaction_id=None,
-            event_type="MODEL_STATUS_CHANGED",
-            actor_type="OPERATOR",
-            actor_id=operator_id,
-            payload={
-                "model_version": model.version,
-                "from": previous,
-                "to": target,
-                "artifact_sha256": model.artifact_sha256,
-            },
+            id=uuid4(), transaction_id=None, event_type="MODEL_STATUS_CHANGED", actor_type="OPERATOR", actor_id=operator_id,
+            payload={"model_version": model.version, "from": previous, "to": target, "artifact_sha256": model.artifact_sha256},
         )
     )
     await session.commit()
@@ -64,31 +55,57 @@ async def _transition(version: str, target: str, *, operator_id: str | None, ses
     return model
 
 
-async def _authorized_transition(version: str, target: str, x_operator_api_key: str | None, x_operator_id: str | None, session: AsyncSession) -> ModelVersion:
+async def _authorized_transition(
+    version: str,
+    target: str,
+    x_operator_api_key: str | None,
+    x_operator_id: str | None,
+    session: AsyncSession,
+) -> ModelVersion:
     operator_id = authorize_operator(x_operator_api_key, x_operator_id, {ROLE_ADMIN})
     return await _transition(version, target, operator_id=operator_id, session=session)
 
 
 @router.post("/{version}/candidate", response_model=dict[str, object])
-async def candidate_model(version: str, x_operator_api_key: str | None = None, x_operator_id: str | None = None, session: AsyncSession = Depends(get_session)) -> dict[str, object]:
+async def candidate_model(
+    version: str,
+    x_operator_api_key: str | None = Header(default=None),
+    x_operator_id: str | None = Header(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, object]:
     model = await _authorized_transition(version, "CANDIDATE", x_operator_api_key, x_operator_id, session)
     return {"version": model.version, "status": model.status}
 
 
 @router.post("/{version}/approve", response_model=dict[str, object])
-async def approve_model(version: str, x_operator_api_key: str | None = None, x_operator_id: str | None = None, session: AsyncSession = Depends(get_session)) -> dict[str, object]:
+async def approve_model(
+    version: str,
+    x_operator_api_key: str | None = Header(default=None),
+    x_operator_id: str | None = Header(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, object]:
     model = await _authorized_transition(version, "APPROVED", x_operator_api_key, x_operator_id, session)
     return {"version": model.version, "status": model.status}
 
 
 @router.post("/{version}/activate", response_model=dict[str, object])
-async def activate_model(version: str, x_operator_api_key: str | None = None, x_operator_id: str | None = None, session: AsyncSession = Depends(get_session)) -> dict[str, object]:
+async def activate_model(
+    version: str,
+    x_operator_api_key: str | None = Header(default=None),
+    x_operator_id: str | None = Header(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, object]:
     model = await _authorized_transition(version, "ACTIVE", x_operator_api_key, x_operator_id, session)
     return {"version": model.version, "status": model.status}
 
 
 @router.post("/{version}/retire", response_model=dict[str, object])
-async def retire_model(version: str, x_operator_api_key: str | None = None, x_operator_id: str | None = None, session: AsyncSession = Depends(get_session)) -> dict[str, object]:
+async def retire_model(
+    version: str,
+    x_operator_api_key: str | None = Header(default=None),
+    x_operator_id: str | None = Header(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, object]:
     model = await _authorized_transition(version, "RETIRED", x_operator_api_key, x_operator_id, session)
     return {"version": model.version, "status": model.status}
 
