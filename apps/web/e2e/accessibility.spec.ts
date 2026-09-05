@@ -1,11 +1,10 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
-// @axe-core/playwright can resolve a nested playwright-core copy whose Page
-// type is structurally compatible at runtime but not identical to the test
-// runner's Page type. Keep the compatibility cast isolated to this adapter.
-function createAxeBuilder(page: Parameters<typeof AxeBuilder>[0]['page']) {
-  return new AxeBuilder({ page: page as never });
+// Keep the adapter boundary isolated because @axe-core/playwright may expose
+// a distinct nested Playwright Page type while accepting the same runtime page.
+function createAxeBuilder(page: unknown) {
+  return new AxeBuilder({ page: page as any });
 }
 
 test('command center has no critical accessibility violations', async ({ page }) => {
