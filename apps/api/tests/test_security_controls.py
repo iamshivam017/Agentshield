@@ -68,6 +68,7 @@ def test_rate_limiter_rejects_after_limit(monkeypatch) -> None:
 
 def test_agent_auth_binds_identity(monkeypatch) -> None:
     agent_id = uuid4()
+    monkeypatch.setattr(settings, "app_env", "development")
     monkeypatch.setattr(settings, "require_agent_auth", True)
     monkeypatch.setattr(settings, "agent_api_key", "agent-secret")
 
@@ -80,6 +81,36 @@ def test_agent_auth_binds_identity(monkeypatch) -> None:
     assert mismatch.value.status_code == 403
 
     authorize_agent(agent_id, "agent-secret", agent_id)
+
+
+def test_protected_environment_requires_agent_auth(monkeypatch) -> None:
+    agent_id = uuid4()
+    monkeypatch.setattr(settings, "app_env", "production")
+    monkeypatch.setattr(settings, "require_agent_auth", False)
+    monkeypatch.setattr(settings, "agent_api_key", None)
+
+    with pytest.raises(HTTPException) as not_configured:
+        authorize_agent(agent_id)
+    assert not_configured.value.status_code == 503
+    assert not_configured.value.detail == "agent_auth_not_configured"
+
+
+def test_protected_environment_accepts_bound_agent_credentials(monkeypatch) -> None:
+    agent_id = uuid4()
+    monkeypatch.setattr(settings, "app_env", "staging")
+    monkeypatch.setattr(settings, "require_agent_auth", False)
+    monkeypatch.setattr(settings, "agent_api_key", "agent-secret")
+
+    authorize_agent(agent_id, "agent-secret", agent_id)
+
+
+def test_development_can_leave_agent_auth_optional(monkeypatch) -> None:
+    agent_id = uuid4()
+    monkeypatch.setattr(settings, "app_env", "development")
+    monkeypatch.setattr(settings, "require_agent_auth", False)
+    monkeypatch.setattr(settings, "agent_api_key", None)
+
+    authorize_agent(agent_id)
 
 
 def test_operator_auth_requires_configured_secret(monkeypatch) -> None:
