@@ -10,7 +10,14 @@ from fastapi import HTTPException
 from agentshield_api.config import settings
 from agentshield_api.contracts import RiskEvaluateRequest
 from agentshield_api.rate_limit import InProcessRateLimiter
-from agentshield_api.security import authorize_agent, authorize_operator
+from agentshield_api.security import (
+    ROLE_ADMIN,
+    ROLE_ANALYST,
+    ROLE_VIEWER,
+    authorize_agent,
+    authorize_operator,
+    require_operator,
+)
 
 
 def canonical_business_fingerprint(request: RiskEvaluateRequest) -> str:
@@ -78,17 +85,43 @@ def test_operator_auth_requires_configured_secret(monkeypatch) -> None:
     monkeypatch.setattr(settings, "app_env", "staging")
     monkeypatch.setattr(settings, "require_operator_auth", False)
     monkeypatch.setattr(settings, "operator_api_key", None)
+    monkeypatch.setattr(settings, "operator_admin_api_key", None)
+    monkeypatch.setattr(settings, "operator_analyst_api_key", None)
+    monkeypatch.setattr(settings, "operator_viewer_api_key", None)
     with pytest.raises(HTTPException) as not_configured:
         authorize_operator()
     assert not_configured.value.status_code == 503
 
 
-def test_operator_auth_validates_secret(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "app_env", "development")
-    monkeypatch.setattr(settings, "require_operator_auth", True)
-    monkeypatch.setattr(settings, "operator_api_key", "operator-secret")
+def test_operator_roles_are_derived_from_secrets_and_enforced(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "app_env", "staging")
+    monkeypatch.setattr(settings, "require_operator_auth", False)
+    monkeypatch.setattr(settings, "operator_api_key", None)
+    monkeypatch.setattr(settings, "operator_admin_api_key", "admin-secret")
+    monkeypatch.setattr(settings, "operator_analyst_api_key", "analyst-secret")
+    monkeypatch.setattr(settings, "operator_viewer_api_key", "viewer-secret")
 
-    with pytest.raises(HTTPException) as invalid:
-        authorize_operator("wrong")
-    assert invalid.value.status_code == 401
-    assert authorize_operator("operator-secret", "risk-admin") == "risk-admin"
+    assert require_operator("admin-secret", "admin-1").role == ROLE_ADMIN
+    assert require_operator("analyst-secret", "analyst-1").role == ROLE_ANALYST
+    assert require_operator("viewer-secret", "viewer-1").role == ROLE_VIEWER
+
+    with pytest.raises(HTTPException) as analyst_denied:
+        authorize_operator("analyst-secret", "analyst-1", {ROLE_ADMIN})
+    assert analyst_denied.value.status_code == 403
+
+    with pytest.raises(HTTPException) as viewer_denied:
+        authorize_operator("viewer-secret", "viewer-1", {ROLE_ANALYST, ROLE_ADMIN})
+    assert viewer_denied.value.status_code == 403
+
+
+def test_operator_role_cannot_be_selected_by_header(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "app_env", "production")
+    monkeypatch.setattr(settings, "require_operator_auth", False)
+    monkeypatch.setattr(settings, "operator_api_key", "admin-secret")
+    monkeypatch.setattr(settings, "operator_admin_api_key", None)
+    monkeypatch.setattr(settings, "operator_analyst_api_key", None)
+    monkeypatch.setattr(settings, "operator_viewer_api_key", None)
+
+    principal = require_operator("admin-secret", "viewer-supplied")
+    assert principal.role == ROLE_ADMIN
+    assert principal.operator_id == "viewer-supplied"
