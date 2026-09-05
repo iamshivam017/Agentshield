@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict, deque
+import os
 from threading import Lock
 from time import monotonic, time
 from typing import Protocol
@@ -88,7 +89,7 @@ class RateLimiter:
 
 
 def build_rate_limiter() -> RateLimiter:
-    redis_url = getattr(settings, "redis_url", None)
+    redis_url = os.getenv("REDIS_URL")
     if redis_url:
         try:
             return RateLimiter(RedisRateStore(redis_url))
