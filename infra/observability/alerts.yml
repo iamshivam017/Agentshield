@@ -1,0 +1,56 @@
+groups:
+  - name: agentshield-api
+    rules:
+      - alert: AgentShieldApiErrorRateHigh
+        expr: sum(rate(agentshield_http_failures_total[5m])) / clamp_min(sum(rate(agentshield_http_requests_total[5m])), 0.001) > 0.02
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: AgentShield API 5xx rate is above 2%
+          description: Investigate API logs, database readiness, and recent deployments.
+
+      - alert: AgentShieldRiskLatencyHigh
+        expr: histogram_quantile(0.95, sum(rate(agentshield_http_latency_ms_bucket{path="/api/v1/risk/evaluate"}[5m])) by (le)) > 500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Risk evaluation p95 latency is above target
+          description: Inspect model serving, feature queries, connection pool saturation, and database plans.
+
+      - alert: AgentShieldModelUnavailable
+        expr: increase(agentshield_model_errors_total{type="unavailable"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Risk model unavailable
+          description: Verify the configured artifact path, checksum, model metadata, and deployment artifact.
+
+      - alert: AgentShieldInvalidWebhookSignatures
+        expr: increase(agentshield_payment_webhook_events_total{event_type="invalid_signature"}[5m]) > 5
+        for: 5m
+        labels:
+          severity: high
+        annotations:
+          summary: Razorpay webhook signature failures increased
+          description: Check webhook secret configuration and upstream delivery source.
+
+      - alert: AgentShieldLLMFallbackRateHigh
+        expr: sum(rate(agentshield_investigations_total{provider="deterministic-fallback"}[15m])) / clamp_min(sum(rate(agentshield_investigations_total[15m])), 0.001) > 0.20
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Investigation fallback rate exceeds 20%
+          description: LLM explanation is degraded; core risk decisions remain authoritative.
+
+      - alert: AgentShieldPaymentUnknownState
+        expr: increase(agentshield_payment_reconciliation_total{state="PAYMENT_UNKNOWN"}[10m]) > 3
+        for: 10m
+        labels:
+          severity: high
+        annotations:
+          summary: Payment reconciliation is producing unknown states
+          description: Inspect provider state mapping and reconciliation responses before declaring payment completion.
