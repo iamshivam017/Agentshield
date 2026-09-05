@@ -50,6 +50,7 @@
 - [x] Migration execution against a live PostgreSQL service in CI
 - [x] PostgreSQL integration coverage for transaction/idempotency invariants
 - [x] PostgreSQL integration coverage for terminal payment state
+- [x] PostgreSQL integration coverage for webhook stale-state protection
 - [ ] Concurrent multi-request budget stress test
 - [ ] Database backup/restore verification
 
@@ -122,9 +123,12 @@
 - [x] Explicit payment state machine
 - [x] Terminal capture integrity enforced at database layer
 - [x] Out-of-order regression protection for captured payments
+- [x] Webhook endpoint integration coverage for stale events
+- [x] Provider reconciliation contract
+- [x] Deterministic reconciliation endpoint
+- [x] Reconciliation audit event
 - [ ] Live Razorpay Test Mode credential execution
-- [ ] Webhook replay/out-of-order integration tests against webhook endpoint
-- [ ] Provider reconciliation path
+- [ ] Live webhook replay against Razorpay Test Mode
 
 ## M19 — Risk Analyst Command Center
 
@@ -179,4 +183,4 @@
 
 ## Next checkpoint
 
-Complete the payment endpoint replay/out-of-order integration tests and provider reconciliation path, then build the investigation/evidence pipeline with explicit provenance and a non-authoritative LLM explanation layer. After that, add centralized observability, performance benchmarks, deployment/rollback artifacts, and the five-reviewer production gap audit.
+Build the investigation/evidence pipeline with explicit provenance, trust levels, evidence hashing, structured AI output validation, deterministic fallback, and a non-authoritative LLM explanation layer. After that, add centralized observability, performance benchmarks, deployment/rollback artifacts, and the five-reviewer production gap audit.
