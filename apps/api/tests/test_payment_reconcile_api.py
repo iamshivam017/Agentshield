@@ -9,8 +9,9 @@ from sqlalchemy import delete, select
 
 from agentshield_api.config import settings
 from agentshield_api.db import SessionLocal
-from agentshield_api.models import Agent, Merchant, PaymentOrder, ProviderPayment, Transaction
+from agentshield_api.models import Agent, AgentPolicy, AgentBudgetState, Merchant, PaymentOrder, ProviderPayment, Transaction
 from app.main import app
+from app.razorpay import MockPaymentProvider
 
 pytestmark = pytest.mark.asyncio
 
@@ -28,40 +29,13 @@ async def test_mock_payment_reconciliation_updates_state_and_audit(monkeypatch: 
     async with SessionLocal() as session:
         session.add(Agent(id=agent_id, name="Reconcile Agent", status="ACTIVE"))
         session.add(Merchant(id=merchant_id, name="Reconcile Merchant", category="SOFTWARE"))
-        session.add(
-            Transaction(
-                id=transaction_id,
-                agent_id=agent_id,
-                merchant_id=merchant_id,
-                amount=Decimal("50.00"),
-                currency="INR",
-                device_id="reconcile-device",
-                occurred_at="2026-09-05T10:00:00+00:00",
-                status="EVALUATED",
-            )
-        )
+        session.add(Transaction(id=transaction_id, agent_id=agent_id, merchant_id=merchant_id, amount=Decimal("50.00"), currency="INR", device_id="reconcile-device", occurred_at="2026-09-05T10:00:00+00:00", status="EVALUATED"))
         await session.flush()
-        session.add(
-            PaymentOrder(
-                id=payment_order_id,
-                transaction_id=transaction_id,
-                provider="mock",
-                provider_order_id=provider_order_id,
-                state="ORDER_CREATED",
-                amount_minor=5000,
-                currency="INR",
-            )
-        )
+        session.add(PaymentOrder(id=payment_order_id, transaction_id=transaction_id, provider="mock", provider_order_id=provider_order_id, state="ORDER_CREATED", amount_minor=5000, currency="INR"))
         await session.commit()
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
-        response = await client.post(
-            f"/api/v1/payments/orders/{transaction_id}/reconcile",
-            headers={
-                "X-Operator-API-Key": "operator-test-key",
-                "X-Operator-ID": "risk-analyst",
-            },
-        )
+        response = await client.post(f"/api/v1/payments/orders/{transaction_id}/reconcile", headers={"X-Operator-API-Key": "operator-test-key", "X-Operator-ID": "risk-analyst"})
         assert response.status_code == 200
         body = response.json()
         assert body["state"] == "PAYMENT_CAPTURED"
@@ -77,7 +51,6 @@ async def test_mock_payment_reconciliation_updates_state_and_audit(monkeypatch: 
         assert order.state == "PAYMENT_CAPTURED"
         assert payment.state == "PAYMENT_CAPTURED"
         assert transaction.status == "PAYMENT_CAPTURED"
-
         await session.execute(delete(ProviderPayment).where(ProviderPayment.payment_order_id == payment_order_id))
         await session.execute(delete(PaymentOrder).where(PaymentOrder.id == payment_order_id))
         await session.execute(delete(Transaction).where(Transaction.id == transaction_id))
@@ -92,7 +65,6 @@ async def test_viewer_cannot_reconcile_payment(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(settings, "operator_api_key", "legacy-admin-key")
     monkeypatch.setattr(settings, "operator_analyst_api_key", "analyst-key")
     monkeypatch.setattr(settings, "operator_viewer_api_key", "viewer-key")
-
     agent_id = uuid4()
     merchant_id = uuid4()
     transaction_id = uuid4()
@@ -101,41 +73,14 @@ async def test_viewer_cannot_reconcile_payment(monkeypatch: pytest.MonkeyPatch) 
     async with SessionLocal() as session:
         session.add(Agent(id=agent_id, name="Viewer Guard Agent", status="ACTIVE"))
         session.add(Merchant(id=merchant_id, name="Viewer Guard Merchant", category="SOFTWARE"))
-        session.add(
-            Transaction(
-                id=transaction_id,
-                agent_id=agent_id,
-                merchant_id=merchant_id,
-                amount=Decimal("25.00"),
-                currency="INR",
-                device_id="viewer-device",
-                occurred_at="2026-09-05T11:00:00+00:00",
-                status="EVALUATED",
-            )
-        )
+        session.add(Transaction(id=transaction_id, agent_id=agent_id, merchant_id=merchant_id, amount=Decimal("25.00"), currency="INR", device_id="viewer-device", occurred_at="2026-09-05T11:00:00+00:00", status="EVALUATED"))
         await session.flush()
-        session.add(
-            PaymentOrder(
-                id=payment_order_id,
-                transaction_id=transaction_id,
-                provider="mock",
-                provider_order_id=f"order_mock_{uuid4().hex}",
-                state="ORDER_CREATED",
-                amount_minor=2500,
-                currency="INR",
-            )
-        )
+        session.add(PaymentOrder(id=payment_order_id, transaction_id=transaction_id, provider="mock", provider_order_id=f"order_mock_{uuid4().hex}", state="ORDER_CREATED", amount_minor=2500, currency="INR"))
         await session.commit()
 
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
-            response = await client.post(
-                f"/api/v1/payments/orders/{transaction_id}/reconcile",
-                headers={
-                    "X-Operator-API-Key": "viewer-key",
-                    "X-Operator-ID": "risk-viewer",
-                },
-            )
+            response = await client.post(f"/api/v1/payments/orders/{transaction_id}/reconcile", headers={"X-Operator-API-Key": "viewer-key", "X-Operator-ID": "risk-viewer"})
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "INSUFFICIENT_OPERATOR_ROLE"
     finally:
@@ -145,3 +90,47 @@ async def test_viewer_cannot_reconcile_payment(monkeypatch: pytest.MonkeyPatch) 
             await session.execute(delete(Merchant).where(Merchant.id == merchant_id))
             await session.execute(delete(Agent).where(Agent.id == agent_id))
             await session.commit()
+
+
+@pytest.mark.integration
+async def test_payment_order_recovery_attaches_existing_provider_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "require_operator_auth", True)
+    monkeypatch.setattr(settings, "operator_api_key", "operator-recovery-key")
+    provider = MockPaymentProvider()
+    monkeypatch.setattr("app.payment_routes._recovery_provider", lambda: provider)
+
+    agent_id = uuid4()
+    merchant_id = uuid4()
+    transaction_id = uuid4()
+
+    async with SessionLocal() as session:
+        session.add(Agent(id=agent_id, name="Recovery Agent", status="ACTIVE"))
+        session.add(Merchant(id=merchant_id, name="Recovery Merchant", category="SOFTWARE"))
+        session.add(AgentPolicy(id=uuid4(), agent_id=agent_id, version=1, is_active=True, rules={"daily_limit": "100.00"}))
+        session.add(Transaction(id=transaction_id, agent_id=agent_id, merchant_id=merchant_id, amount=Decimal("30.00"), currency="INR", device_id="recovery-device", occurred_at="2026-09-05T12:00:00+00:00", status="EVALUATED"))
+        await session.commit()
+
+    await provider.create_order(amount=Decimal("30.00"), currency="INR", receipt=str(transaction_id))
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+        response = await client.post(f"/api/v1/payments/orders/{transaction_id}/recover", headers={"X-Operator-API-Key": "operator-recovery-key", "X-Operator-ID": "risk-analyst"})
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "recovered"
+        assert body["provider"] == "mock"
+
+    async with SessionLocal() as session:
+        order = await session.scalar(select(PaymentOrder).where(PaymentOrder.transaction_id == transaction_id))
+        budget = await session.scalar(select(AgentBudgetState).where(AgentBudgetState.agent_id == agent_id, AgentBudgetState.period_key == "2026-09-05"))
+        assert order is not None
+        assert order.provider_order_id == "order_mock_1"
+        assert budget is not None
+        assert budget.spent == Decimal("30.00")
+        assert budget.reserved == Decimal("0.00")
+        await session.execute(delete(PaymentOrder).where(PaymentOrder.transaction_id == transaction_id))
+        await session.execute(delete(AgentBudgetState).where(AgentBudgetState.agent_id == agent_id))
+        await session.execute(delete(AgentPolicy).where(AgentPolicy.agent_id == agent_id))
+        await session.execute(delete(Transaction).where(Transaction.id == transaction_id))
+        await session.execute(delete(Merchant).where(Merchant.id == merchant_id))
+        await session.execute(delete(Agent).where(Agent.id == agent_id))
+        await session.commit()
