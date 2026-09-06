@@ -174,6 +174,7 @@ async def test_concurrent_payment_orders_same_transaction_create_one_provider_or
                 status="EVALUATED",
             )
         )
+        await session.flush()
         session.add(
             RiskDecision(
                 id=uuid4(),
