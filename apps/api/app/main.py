@@ -357,8 +357,11 @@ async def create_payment_order(request: PaymentOrderRequest, session: AsyncSessi
         return PaymentOrderResponse.model_validate(replay)
     await create_idempotency_claim(session, scope=scope, key=request.idempotency_key, request_hash_value=req_hash)
     transaction = await session.scalar(select(Transaction).where(Transaction.id == request.transaction_id))
+    if transaction is None:
+        raise HTTPException(status_code=404, detail="transaction_or_decision_not_found")
+    await session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": advisory_lock_key("payment:order:transaction", str(transaction.id))})
     decision = await session.scalar(select(RiskDecision).where(RiskDecision.transaction_id == request.transaction_id))
-    if transaction is None or decision is None:
+    if decision is None:
         raise HTTPException(status_code=404, detail="transaction_or_decision_not_found")
     if decision.decision != "ALLOW":
         raise HTTPException(status_code=409, detail="payment_requires_allow_decision")
