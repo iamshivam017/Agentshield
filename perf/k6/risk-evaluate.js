@@ -6,7 +6,7 @@ const baseUrl = __ENV.AGENTSHIELD_BASE_URL || 'http://127.0.0.1:8000';
 const agentId = __ENV.AGENT_ID;
 const merchantId = __ENV.MERCHANT_ID;
 const agentApiKey = __ENV.AGENT_API_KEY || '';
-const profile = (__ENV.K6_PROFILE || 'baseline').toLowerCase();
+const profile = (__ENV.K6_PROFILE || 'load').toLowerCase();
 
 if (!agentId || !merchantId) {
   throw new Error('AGENT_ID and MERCHANT_ID are required');
