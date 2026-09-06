@@ -1,6 +1,6 @@
 # AgentShield Final Five-Reviewer Audit
 
-Date: 2026-09-05
+Date: 2026-09-06
 
 This audit separates repository-verified evidence from environment-dependent release evidence. It is based on the implemented source, CI contract, and current release-gate document.
 
@@ -57,13 +57,13 @@ This audit separates repository-verified evidence from environment-dependent rel
 
 | Area | Result | Evidence / finding |
 | --- | --- | --- |
-| CI repeatability | PASS | CI run 217 completed successfully across ML, API, Web and containers. |
+| CI repeatability | PASS | CI runs have continued successfully through the repository hardening cycle; run 246 was fully successful, and subsequent runs 247–249 are validating the latest performance-profile changes. |
 | Database migrations | PASS | Live PostgreSQL migration validation runs in CI. |
 | Backup / restore | PASS | CI executes a backup and isolated restore drill. |
 | Containers | PASS | API and Web container builds complete successfully. |
 | Observability | PASS | Request telemetry, Prometheus-compatible metrics, alerts, scrape configuration and incident runbooks are present. |
-| Performance test definition | PASS | k6 risk-evaluation profile defines p95, p99 and error-rate gates. |
-| Target performance evidence | OPEN | The k6 profile exists, but measured target-environment performance results have not been supplied. |
+| Performance test definition | PASS | k6 risk-evaluation profiles define smoke, load, stress and soak execution plus p95, p99 and error-rate gates. |
+| Target performance evidence | OPEN | The k6 profiles exist, but measured target-environment performance results have not been supplied. |
 | Deployment / IaC | OPEN | A concrete target environment has not been selected, so target-specific IaC is intentionally not claimed complete. |
 | Rollback / operations | ACCEPTED RISK | Repository procedures exist, but execution evidence against a real deployment target is still required. |
 
