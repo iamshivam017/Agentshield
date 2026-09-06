@@ -57,21 +57,37 @@ Required environment evidence:
 - raw webhook signature verification succeeds before payload processing;
 - duplicate provider event IDs are idempotent;
 - stale/out-of-order provider events cannot move a payment backward;
-- reconciliation produces an auditable result.
+- reconciliation produces an auditable result;
+- provider-order recovery can reattach an externally-created order after a local persistence failure, using the transaction receipt and amount/currency integrity checks.
 
 No production Razorpay credentials belong in CI, local fixtures, demos, or screenshots.
 
 ## 4. Performance gate
 
-Execute the existing k6 profile against the selected deployment target with real target-equivalent configuration.
+Execute `perf/k6/risk-evaluate.js` against the selected deployment target with real target-equivalent configuration.
 
-Required targets:
+Select one profile with `K6_PROFILE`:
+
+```text
+smoke  — 2 VUs for 15s
+load   — ramp to 10 VUs, sustain, ramp down
+stress — ramp through 25/50/75 VUs
+soak   — ramp to 20 VUs and sustain for 10 minutes
+```
+
+Required baseline targets for smoke/load/soak:
 
 - risk evaluation p95 < 500 ms;
 - risk evaluation p99 < 1 s;
 - HTTP failure rate < 1%.
 
-Record the environment, commit SHA, model version, load profile, test duration, request count, p95, p99, error rate, and date/time with the run.
+Stress uses a deliberately wider failure/latency envelope to identify capacity limits:
+
+- HTTP failure rate < 2%;
+- p95 < 750 ms;
+- p99 < 1.5 s.
+
+Record the environment, commit SHA, model version, load profile, test duration, request count, p95, p99, error rate, and date/time with every run.
 
 Repository presence of the k6 script is not itself performance evidence.
 
