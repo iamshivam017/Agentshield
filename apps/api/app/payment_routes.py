@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -13,7 +14,7 @@ from agentshield_api.models import AgentPolicy, AuditEvent, PaymentOrder, Provid
 from agentshield_api.observability import telemetry
 from app.main import advisory_lock_key, reserve_agent_budget, settle_budget_reservation
 from app.payment_state import monotonic_state_update
-from app.razorpay import MockPaymentProvider, PaymentProviderError, RazorpayTestProvider
+from app.razorpay import MockPaymentProvider, PaymentProviderError, RazorpayTestProvider, amount_to_minor
 
 router = APIRouter(prefix="/api/v1/payments", tags=["payments"])
 
@@ -55,7 +56,7 @@ async def recover_payment_order(transaction_id: UUID, session: AsyncSession = De
         telemetry.increment("payment_recovery_total", provider="razorpay", state="NOT_FOUND")
         raise HTTPException(status_code=404, detail="provider_order_not_found")
 
-    expected_minor = int(Decimal(str(transaction.amount)) * (10 ** {"BHD": 3, "KWD": 3, "OMR": 3}.get(transaction.currency.upper(), 2)))
+    expected_minor = amount_to_minor(transaction.amount, currency=transaction.currency)
     if order.amount_minor != expected_minor or order.currency != transaction.currency.upper():
         telemetry.increment("payment_recovery_total", provider="razorpay", state="MISMATCH")
         raise HTTPException(status_code=409, detail="provider_order_mismatch")
@@ -64,7 +65,7 @@ async def recover_payment_order(transaction_id: UUID, session: AsyncSession = De
     if policy is None:
         raise HTTPException(status_code=409, detail="active_policy_not_configured")
     daily_limit = Decimal(str((policy.rules or {}).get("daily_limit", settings.daily_limit_default)))
-    period_key = transaction.occurred_at.astimezone().date().isoformat()
+    period_key = transaction.occurred_at.astimezone(timezone.utc).date().isoformat()
     await reserve_agent_budget(session, agent_id=transaction.agent_id, amount=transaction.amount, daily_limit=daily_limit, period_key=period_key)
 
     session.add(PaymentOrder(id=uuid4(), transaction_id=transaction.id, provider=order.provider, provider_order_id=order.order_id, state=order.state, amount_minor=order.amount_minor, currency=order.currency))
