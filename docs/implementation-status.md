@@ -181,7 +181,8 @@
 - [x] Prometheus scrape configuration
 - [x] Baseline alert rules
 - [x] Operational incident runbooks
-- [x] k6 risk-evaluation load profile
+- [x] k6 risk-evaluation performance profiles: smoke, load, stress, and soak
+- [x] CI syntax and profile validation for k6 performance script
 
 ## Security & Operations
 
@@ -222,6 +223,7 @@
 - [x] Trained smoke artifact checksum verification in API CI
 - [x] PostgreSQL backup/restore smoke in CI
 - [x] Redis rate-limiter integration in CI
+- [x] k6 performance script syntax/profile validation
 
 ## Release gates still requiring environment-specific evidence
 
