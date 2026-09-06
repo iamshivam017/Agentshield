@@ -160,9 +160,29 @@ jobs:
       - name: Dependency audit
         run: npm audit --audit-level=high
 
+  performance-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Validate k6 script syntax
+        run: node --check perf/k6/risk-evaluate.js
+      - name: Validate supported performance profiles
+        run: |
+          grep -q "K6_PROFILE || 'load'" perf/k6/risk-evaluate.js
+          for profile in smoke load stress soak; do
+            grep -q "^  ${profile}:" perf/k6/risk-evaluate.js
+            grep -q "${profile}: {" perf/k6/risk-evaluate.js
+          done
+
   container:
     runs-on: ubuntu-latest
-    needs: [api, ml, web]
+    needs: [api, ml, web, performance-script]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
