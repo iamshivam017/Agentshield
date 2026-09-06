@@ -54,9 +54,13 @@ scripts/               # Developer and data/ML utilities
 .github/workflows/     # CI/CD
 ```
 
-### Development status
+### Current status
 
-Repository foundation in progress. No production secrets or real payment credentials belong in this repository.
+**Repository engineering gate: PASS.** CI verifies API, ML, web, container, database-migration, backup/restore, browser E2E/accessibility, and k6 performance-script validation.
+
+**Production release: not yet declared.** Remaining gates require environment evidence: persistent model activation, Razorpay Test Mode execution and webhook replay, a selected deployment target, target performance measurements, centralized production telemetry, and rollback evidence.
+
+No production secrets or real payment credentials belong in this repository.
 
 ### Safety boundary
 
