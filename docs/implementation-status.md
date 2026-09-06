@@ -123,6 +123,8 @@
 - [x] ALLOW-only order creation boundary
 - [x] Payment order persistence
 - [x] Budget reservation and settlement around order creation
+- [x] PostgreSQL transaction-scoped serialization for same-transaction order creation
+- [x] Same-transaction concurrent provider-call regression coverage
 - [x] Raw-body HMAC-SHA256 webhook verification
 - [x] Provider event-id duplicate handling
 - [x] Authorized/captured/failed state mapping
@@ -134,6 +136,9 @@
 - [x] Deterministic reconciliation endpoint
 - [x] Reconciliation audit event
 - [x] Reconciliation telemetry
+- [x] Receipt-based provider-order recovery path for DB/provider crash gaps
+- [x] Recovery amount/currency integrity validation
+- [x] Recovery endpoint least-privilege operator protection
 - [ ] Live Razorpay Test Mode credential execution
 - [ ] Live webhook replay against Razorpay Test Mode
 
