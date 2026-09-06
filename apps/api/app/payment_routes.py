@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentshield_api.config import settings
 from agentshield_api.db import get_session
-from agentshield_api.models import AuditEvent, PaymentOrder, ProviderPayment, Transaction
+from agentshield_api.models import AgentPolicy, AuditEvent, PaymentOrder, ProviderPayment, Transaction
 from agentshield_api.observability import telemetry
+from app.main import advisory_lock_key, reserve_agent_budget, settle_budget_reservation
 from app.payment_state import monotonic_state_update
 from app.razorpay import MockPaymentProvider, PaymentProviderError, RazorpayTestProvider
 
@@ -24,6 +26,53 @@ def _provider_for(order: PaymentOrder):
             raise HTTPException(status_code=503, detail="razorpay_test_mode_not_configured")
         return RazorpayTestProvider(key_id=settings.razorpay_key_id, key_secret=settings.razorpay_key_secret)
     raise HTTPException(status_code=503, detail="payment_provider_not_supported")
+
+
+def _recovery_provider():
+    if not settings.razorpay_key_id or not settings.razorpay_key_secret:
+        raise HTTPException(status_code=503, detail="razorpay_test_mode_not_configured")
+    return RazorpayTestProvider(key_id=settings.razorpay_key_id, key_secret=settings.razorpay_key_secret)
+
+
+@router.post("/orders/{transaction_id}/recover")
+async def recover_payment_order(transaction_id: UUID, session: AsyncSession = Depends(get_session)) -> dict[str, object]:
+    transaction = await session.scalar(select(Transaction).where(Transaction.id == transaction_id))
+    if transaction is None:
+        raise HTTPException(status_code=404, detail="transaction_not_found")
+
+    await session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": advisory_lock_key("payment:order:transaction", str(transaction.id))})
+    existing = await session.scalar(select(PaymentOrder).where(PaymentOrder.transaction_id == transaction.id))
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="payment_order_already_exists")
+
+    provider = _recovery_provider()
+    try:
+        order = await provider.find_order_by_receipt(receipt=str(transaction.id))
+    except PaymentProviderError as exc:
+        telemetry.increment("payment_recovery_total", provider="razorpay", state="PROVIDER_ERROR")
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    if order is None:
+        telemetry.increment("payment_recovery_total", provider="razorpay", state="NOT_FOUND")
+        raise HTTPException(status_code=404, detail="provider_order_not_found")
+
+    expected_minor = int(Decimal(str(transaction.amount)) * (10 ** {"BHD": 3, "KWD": 3, "OMR": 3}.get(transaction.currency.upper(), 2)))
+    if order.amount_minor != expected_minor or order.currency != transaction.currency.upper():
+        telemetry.increment("payment_recovery_total", provider="razorpay", state="MISMATCH")
+        raise HTTPException(status_code=409, detail="provider_order_mismatch")
+
+    policy = await session.scalar(select(AgentPolicy).where(AgentPolicy.agent_id == transaction.agent_id, AgentPolicy.is_active.is_(True)).order_by(AgentPolicy.version.desc()))
+    if policy is None:
+        raise HTTPException(status_code=409, detail="active_policy_not_configured")
+    daily_limit = Decimal(str((policy.rules or {}).get("daily_limit", settings.daily_limit_default)))
+    period_key = transaction.occurred_at.astimezone().date().isoformat()
+    await reserve_agent_budget(session, agent_id=transaction.agent_id, amount=transaction.amount, daily_limit=daily_limit, period_key=period_key)
+
+    session.add(PaymentOrder(id=uuid4(), transaction_id=transaction.id, provider=order.provider, provider_order_id=order.order_id, state=order.state, amount_minor=order.amount_minor, currency=order.currency))
+    await settle_budget_reservation(session, agent_id=transaction.agent_id, amount=transaction.amount, period_key=period_key, success=True)
+    session.add(AuditEvent(id=uuid4(), transaction_id=transaction.id, event_type="PAYMENT_ORDER_RECOVERED", actor_type="SYSTEM", actor_id=None, payload={"provider": order.provider, "provider_order_id": order.order_id, "state": order.state, "recovery_source": "provider_receipt_lookup"}))
+    await session.commit()
+    telemetry.increment("payment_recovery_total", provider=order.provider, state="RECOVERED")
+    return {"status": "recovered", "transaction_id": transaction.id, "provider": order.provider, "provider_order_id": order.order_id, "state": order.state}
 
 
 @router.post("/orders/{transaction_id}/reconcile")
@@ -45,30 +94,15 @@ async def reconcile_payment_order(transaction_id: UUID, session: AsyncSession = 
     order.state = next_order_state
 
     if observed.provider_payment_id:
-        provider_payment = await session.scalar(
-            select(ProviderPayment).where(ProviderPayment.provider_payment_id == observed.provider_payment_id)
-        )
+        provider_payment = await session.scalar(select(ProviderPayment).where(ProviderPayment.provider_payment_id == observed.provider_payment_id))
         if provider_payment is None:
-            provider_payment = ProviderPayment(
-                id=uuid4(),
-                provider_payment_id=observed.provider_payment_id,
-                payment_order_id=order.id,
-                state=observed.payment_state or observed.state,
-                raw_event={"source": "reconciliation", "order_id": order.provider_order_id},
-            )
+            provider_payment = ProviderPayment(id=uuid4(), provider_payment_id=observed.provider_payment_id, payment_order_id=order.id, state=observed.payment_state or observed.state, raw_event={"source": "reconciliation", "order_id": order.provider_order_id})
             session.add(provider_payment)
         else:
             provider_payment.payment_order_id = order.id
-            provider_payment.state = monotonic_state_update(
-                provider_payment.state,
-                observed.payment_state or observed.state,
-            )
+            provider_payment.state = monotonic_state_update(provider_payment.state, observed.payment_state or observed.state)
     elif observed.payment_state:
-        provider_payment = await session.scalar(
-            select(ProviderPayment)
-            .where(ProviderPayment.payment_order_id == order.id)
-            .order_by(ProviderPayment.created_at.desc())
-        )
+        provider_payment = await session.scalar(select(ProviderPayment).where(ProviderPayment.payment_order_id == order.id).order_by(ProviderPayment.created_at.desc()))
         if provider_payment is not None:
             provider_payment.state = monotonic_state_update(provider_payment.state, observed.payment_state)
 
@@ -77,28 +111,6 @@ async def reconcile_payment_order(transaction_id: UUID, session: AsyncSession = 
         changed = True
 
     telemetry.increment("payment_reconciliation_total", provider=observed.provider, state=order.state)
-    session.add(
-        AuditEvent(
-            id=uuid4(),
-            transaction_id=transaction_id,
-            event_type="PAYMENT_RECONCILED",
-            actor_type="SYSTEM",
-            actor_id=None,
-            payload={
-                "provider": observed.provider,
-                "provider_order_id": observed.order_id,
-                "observed_state": observed.state,
-                "effective_state": order.state,
-                "changed": changed,
-            },
-        )
-    )
+    session.add(AuditEvent(id=uuid4(), transaction_id=transaction_id, event_type="PAYMENT_RECONCILED", actor_type="SYSTEM", actor_id=None, payload={"provider": observed.provider, "provider_order_id": observed.order_id, "observed_state": observed.state, "effective_state": order.state, "changed": changed}))
     await session.commit()
-    return {
-        "status": "reconciled",
-        "transaction_id": transaction_id,
-        "provider": observed.provider,
-        "provider_order_id": observed.order_id,
-        "state": order.state,
-        "changed": changed,
-    }
+    return {"status": "reconciled", "transaction_id": transaction_id, "provider": observed.provider, "provider_order_id": observed.order_id, "state": order.state, "changed": changed}
