@@ -201,6 +201,7 @@
 - [x] Redis-backed distributed rate limiting
 - [ ] Load/stress/soak benchmark execution against target environment
 - [x] Render deployment Blueprint prepared
+- [x] Render Deploy button documented in README
 - [x] Backup/restore drill
 - [x] Durable GitHub model-release workflow prepared
 
@@ -227,6 +228,8 @@
 - [x] Redis rate-limiter integration in CI
 - [x] k6 performance script syntax/profile validation
 - [x] CI run #278 fully green on commit `1d17df429aad905320a9f3f2a80d212f81bd8ae7`
+- [x] CI run #279 fully green on commit `58353baf90a08e9b9cb41ab3e1769b2426913c0b`
+- [x] CI run #280 fully green on commit `98e2a4bacf9d22f35e56cd1a05a25cb924166fba`
 
 ## Release gates still requiring environment-specific evidence
 
