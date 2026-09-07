@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const API_TARGET = process.env.AGENTSHIELD_API_URL ?? 'http://localhost:8000';
+const configuredApiTarget = process.env.AGENTSHIELD_API_URL ?? 'http://localhost:8000';
+const API_TARGET = configuredApiTarget.includes('://') ? configuredApiTarget : `http://${configuredApiTarget}`;
 const OPERATOR_API_KEY = process.env.AGENTSHIELD_OPERATOR_API_KEY;
 const OPERATOR_ID = process.env.AGENTSHIELD_OPERATOR_ID;
 
