@@ -54,6 +54,38 @@ scripts/               # Developer and data/ML utilities
 .github/workflows/     # CI/CD
 ```
 
+### Local development
+
+Prerequisites: Docker Desktop, Python 3.12+, and Node.js 24+.
+
+```bash
+# Install API/ML and web dependencies
+make install
+
+# Start PostgreSQL + Redis and the application stack
+a make dev
+```
+
+For infrastructure-only startup:
+
+```bash
+make infra-up
+```
+
+Common verification commands:
+
+```bash
+make db-migrate
+make db-seed
+make ml-all
+make ml-verify
+make test
+make test-e2e
+make verify-all
+```
+
+The Makefile is the source of truth for these local workflows. Keep real credentials out of `.env` committed files; use the repository environment template and local secret storage instead.
+
 ### Current status
 
 **Repository engineering gate: PASS.** CI verifies API, ML, web, container, database-migration, backup/restore, browser E2E/accessibility, and k6 performance-script validation.
