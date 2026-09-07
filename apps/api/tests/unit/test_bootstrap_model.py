@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 
-BOOTSTRAP_PATH = Path(__file__).resolve().parents[3] / "scripts" / "bootstrap_model.py"
+BOOTSTRAP_PATH = Path(__file__).resolve().parents[4] / "scripts" / "bootstrap_model.py"
 _SPEC = importlib.util.spec_from_file_location("agentshield_bootstrap_model", BOOTSTRAP_PATH)
 if _SPEC is None or _SPEC.loader is None:
     raise RuntimeError(f"Unable to load bootstrap helper from {BOOTSTRAP_PATH}")
