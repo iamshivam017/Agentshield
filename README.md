@@ -91,7 +91,7 @@ The Makefile is the source of truth for these local workflows. Keep real credent
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/iamshivam017/Agentshield)
 
-The repository includes a Render Blueprint at `render.yaml` for the API, web UI, PostgreSQL, and Redis services. Render's Blueprint flow provisions the interconnected resources from that file; the unresolved values marked `sync: false` must be supplied in the Render dashboard. citeturn620737search2turn620737search4
+The repository includes a Render Blueprint at `render.yaml` for the API, web UI, PostgreSQL, and Redis services. Render's Blueprint flow provisions the interconnected resources from that file; the unresolved values marked `sync: false` must be supplied in the Render dashboard.
 
 ### Current status
 
