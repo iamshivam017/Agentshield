@@ -65,7 +65,7 @@ services:
         fromService:
           type: web
           name: agentshield-api
-          property: host
+          property: hostport
 
   - type: keyvalue
     name: agentshield-redis
