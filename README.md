@@ -76,7 +76,6 @@ Common verification commands:
 
 ```bash
 make db-migrate
-make db-seed
 make ml-all
 make ml-verify
 make test
@@ -84,7 +83,9 @@ make test-e2e
 make verify-all
 ```
 
-The Makefile is the source of truth for these local workflows. Keep real credentials out of `.env` committed files; use the repository environment template and local secret storage instead.
+For a running environment, use `make production-check` for health/readiness probes or `make perf-smoke` with `AGENTSHIELD_BASE_URL`, `AGENT_ID`, `MERCHANT_ID`, and `AGENT_API_KEY` set.
+
+The Makefile is the source of truth for these local workflows. Keep real credentials out of committed `.env` files; use the repository environment template and local secret storage instead.
 
 ### Current status
 
