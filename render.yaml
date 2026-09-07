@@ -1,0 +1,74 @@
+services:
+  - type: web
+    name: agentshield-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/live
+    dockerCommand: sh -c 'uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}'
+    envVars:
+      - key: APP_ENV
+        value: staging
+      - key: DATABASE_URL
+        fromDatabase:
+          name: agentshield-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: agentshield-redis
+          property: connectionString
+      - key: REQUIRE_AGENT_AUTH
+        value: "true"
+      - key: REQUIRE_OPERATOR_AUTH
+        value: "true"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: AGENT_API_KEY
+        sync: false
+      - key: OPERATOR_ADMIN_API_KEY
+        sync: false
+      - key: OPERATOR_ANALYST_API_KEY
+        sync: false
+      - key: OPERATOR_VIEWER_API_KEY
+        sync: false
+      - key: RISK_MODEL_ARTIFACT_PATH
+        sync: false
+      - key: RISK_MODEL_ARTIFACT_SHA256
+        sync: false
+      - key: RISK_MODEL_METADATA_PATH
+        sync: false
+      - key: RISK_MODEL_VERSION
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: LLM_PROVIDER
+        value: none
+
+  - type: web
+    name: agentshield-web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./apps/web/Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    envVars:
+      - key: AGENTSHIELD_API_URL
+        fromService:
+          type: web
+          name: agentshield-api
+          property: host
+
+  - type: keyvalue
+    name: agentshield-redis
+    plan: free
+    ipAllowList: []
+
+databases:
+  - name: agentshield-db
+    plan: free
