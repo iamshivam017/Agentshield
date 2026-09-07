@@ -1,0 +1,136 @@
+name: Release Risk Model
+
+on:
+  workflow_dispatch:
+    inputs:
+      ci_run_id:
+        description: "Successful CI run ID containing the verified model artifact"
+        required: true
+        type: string
+      commit_sha:
+        description: "Commit SHA that the model release will target"
+        required: true
+        type: string
+      model_version:
+        description: "Expected model version from CI metadata"
+        required: true
+        type: string
+      approval:
+        description: "Type APPROVE to authorize publication of this model artifact"
+        required: true
+        type: string
+      release_tag:
+        description: "Git tag/release name, for example model-v1.0.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout target commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.commit_sha }}
+          fetch-depth: 1
+
+      - name: Validate approval gate
+        env:
+          APPROVAL: ${{ inputs.approval }}
+        run: |
+          test "$APPROVAL" = "APPROVE"
+
+      - name: Download verified CI model artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.ci_run_id }}
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+        run: |
+          mkdir -p /tmp/agentshield-model
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name "agentshield-risk-model-smoke-$COMMIT_SHA" --dir /tmp/agentshield-model
+
+      - name: Install model verification dependencies
+        run: python -m pip install -r ml/requirements.txt
+
+      - name: Verify artifact and metadata
+        env:
+          EXPECTED_VERSION: ${{ inputs.model_version }}
+        run: |
+          PYTHONPATH=ml/src python scripts/verify_model_artifact.py /tmp/agentshield-model
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          metadata = json.loads(Path('/tmp/agentshield-model/metadata.json').read_text(encoding='utf-8'))
+          expected = os.environ['EXPECTED_VERSION']
+          assert metadata['model_version'] == expected, (metadata['model_version'], expected)
+          assert metadata['status'] == 'EVALUATED', metadata['status']
+          PY
+
+      - name: Promote release metadata to APPROVED
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('/tmp/agentshield-model/metadata.json')
+          metadata = json.loads(path.read_text(encoding='utf-8'))
+          metadata['status'] = 'APPROVED'
+          path.write_text(json.dumps(metadata, indent=2, sort_keys=True) + '\\n', encoding='utf-8')
+          PY
+
+      - name: Re-verify approved release artifact
+        run: PYTHONPATH=ml/src python scripts/verify_model_artifact.py /tmp/agentshield-model
+
+      - name: Package release manifest
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+        run: |
+          mkdir -p /tmp/agentshield-release
+          cp /tmp/agentshield-model/model.joblib /tmp/agentshield-release/model.joblib
+          cp /tmp/agentshield-model/metadata.json /tmp/agentshield-release/metadata.json
+          sha256sum /tmp/agentshield-release/model.joblib > /tmp/agentshield-release/SHA256SUMS
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          metadata = json.loads(Path('/tmp/agentshield-release/metadata.json').read_text(encoding='utf-8'))
+          manifest = {
+              'release_tag': os.environ['RELEASE_TAG'],
+              'commit_sha': os.environ['COMMIT_SHA'],
+              'model_version': metadata['model_version'],
+              'artifact_sha256': metadata['artifact_sha256'],
+              'feature_version': metadata['feature_version'],
+              'status': metadata['status'],
+          }
+          Path('/tmp/agentshield-release/release-manifest.json').write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + '\\n',
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$COMMIT_SHA" \
+            --title "AgentShield Risk Model $RELEASE_TAG" \
+            --generate-notes \
+            /tmp/agentshield-release/model.joblib \
+            /tmp/agentshield-release/metadata.json \
+            /tmp/agentshield-release/SHA256SUMS \
+            /tmp/agentshield-release/release-manifest.json
