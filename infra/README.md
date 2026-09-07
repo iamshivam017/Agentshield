@@ -6,6 +6,10 @@
 
 The Blueprint intentionally does not contain secret values. Agent credentials, operator credentials, model artifact paths/checksums, Razorpay Test Mode credentials, and webhook secrets must be supplied through the Render dashboard/secret configuration.
 
+The API Docker image runs `alembic upgrade head` before the application process starts. This is intentional for the current free staging target because Render's `preDeployCommand` is a paid-service capability; a production deployment should move migrations to a dedicated pre-deploy step or release job.
+
+The Blueprint uses Render's `checksPass` auto-deploy trigger so a repository push does not become a staging deployment until the required GitHub checks pass.
+
 The production model artifact remains an external release input. The deployment is not considered release-ready until a verified model artifact and matching SHA-256 metadata are supplied and the persisted model is promoted to `APPROVED`/`ACTIVE`.
 
 ## Deployment model
