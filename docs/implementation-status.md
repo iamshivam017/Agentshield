@@ -199,7 +199,7 @@
 - [ ] Centralized multi-instance metrics backend deployment
 - [x] Redis-backed distributed rate limiting
 - [ ] Load/stress/soak benchmark execution against target environment
-- [ ] IaC for target deployment environment
+- [x] Render deployment Blueprint prepared
 - [x] Backup/restore drill
 
 ## CI verification
