@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 
 import pytest
 
-from scripts.bootstrap_model import main
+
+BOOTSTRAP_PATH = Path(__file__).resolve().parents[3] / "scripts" / "bootstrap_model.py"
+_SPEC = importlib.util.spec_from_file_location("agentshield_bootstrap_model", BOOTSTRAP_PATH)
+if _SPEC is None or _SPEC.loader is None:
+    raise RuntimeError(f"Unable to load bootstrap helper from {BOOTSTRAP_PATH}")
+_BOOTSTRAP_MODULE = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(_BOOTSTRAP_MODULE)
+main = _BOOTSTRAP_MODULE.main
 
 
 def write_metadata(path: Path, *, sha: str, version: str = "baseline-logistic-v1", status: str = "ACTIVE") -> None:
