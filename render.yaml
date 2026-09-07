@@ -3,6 +3,8 @@ services:
     name: agentshield-api
     runtime: docker
     plan: free
+    region: singapore
+    autoDeployTrigger: checksPass
     dockerfilePath: ./apps/api/Dockerfile
     dockerContext: .
     healthCheckPath: /health/live
@@ -57,6 +59,8 @@ services:
     name: agentshield-web
     runtime: docker
     plan: free
+    region: singapore
+    autoDeployTrigger: checksPass
     dockerfilePath: ./apps/web/Dockerfile
     dockerContext: .
     healthCheckPath: /
@@ -71,7 +75,9 @@ services:
     name: agentshield-redis
     plan: free
     ipAllowList: []
+    region: singapore
 
 databases:
   - name: agentshield-db
     plan: free
+    region: singapore
