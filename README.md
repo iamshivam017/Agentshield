@@ -95,7 +95,7 @@ The repository includes a Render Blueprint at `render.yaml` for the API, web UI,
 
 ### Current status
 
-**Repository engineering gate: PASS.** CI run **#280** on commit `98e2a4bacf9d22f35e56cd1a05a25cb924166fba` completed successfully across API, ML, web, performance-script validation, and container builds.
+**Repository engineering gate: PASS.** CI run **#283** on commit `63aae9c24fd512c8195125e18d5dd75cae02ab10` completed successfully across API, ML, web, performance-script validation, and container builds.
 
 **Production release: not yet declared.** The remaining gates are intentionally environment-specific: persistent model activation, Razorpay Test Mode execution and webhook replay, target deployment evidence, target load/stress/soak measurements, centralized production telemetry, and rollback evidence.
 
