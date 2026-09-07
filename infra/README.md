@@ -2,9 +2,9 @@
 
 ## Reference deployment target: Render
 
-`render.yaml` defines the current hackathon/staging deployment target for AgentShield using Render Docker web services, managed PostgreSQL, and Redis-compatible Key Value. Render supports Docker services in a monorepo and Blueprint-managed Postgres/Key Value resources. Free instances are suitable for a temporary demo/staging environment; they are not production-grade because free web services spin down and free Postgres expires after 30 days and has no backups. citeturn386146search0turn180414search0
+`render.yaml` defines the current hackathon/staging deployment target for AgentShield using Render Docker web services, managed PostgreSQL, and Redis-compatible Key Value. Render supports Docker services in a monorepo and Blueprint-managed Postgres/Key Value resources. Free instances are suitable for a temporary demo/staging environment; they are not production-grade because free web services spin down and free Postgres expires after 30 days and has no backups.
 
-The Blueprint intentionally does not contain secret values. Agent credentials, operator credentials, model artifact paths/checksums, Razorpay Test Mode credentials, and webhook secrets must be supplied through the Render dashboard/secret configuration. citeturn386146search7
+The Blueprint intentionally does not contain secret values. Agent credentials, operator credentials, model artifact paths/checksums, Razorpay Test Mode credentials, and webhook secrets must be supplied through the Render dashboard/secret configuration.
 
 The production model artifact remains an external release input. The deployment is not considered release-ready until a verified model artifact and matching SHA-256 metadata are supplied and the persisted model is promoted to `APPROVED`/`ACTIVE`.
 
