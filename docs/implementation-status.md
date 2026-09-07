@@ -76,6 +76,7 @@
 - [x] Persisted model lifecycle governance: TRAINED → EVALUATED → CANDIDATE → APPROVED → ACTIVE → RETIRED
 - [x] Admin-only model lifecycle mutation endpoints
 - [ ] Final trained model promoted to APPROVED/ACTIVE with persisted production artifact
+- [x] CI-backed release workflow validates and packages an explicitly approved model artifact
 
 ## M17 — Risk Decision API
 
@@ -201,6 +202,7 @@
 - [ ] Load/stress/soak benchmark execution against target environment
 - [x] Render deployment Blueprint prepared
 - [x] Backup/restore drill
+- [x] Durable GitHub model-release workflow prepared
 
 ## CI verification
 
@@ -224,6 +226,7 @@
 - [x] PostgreSQL backup/restore smoke in CI
 - [x] Redis rate-limiter integration in CI
 - [x] k6 performance script syntax/profile validation
+- [x] CI run #278 fully green on commit `1d17df429aad905320a9f3f2a80d212f81bd8ae7`
 
 ## Release gates still requiring environment-specific evidence
 
