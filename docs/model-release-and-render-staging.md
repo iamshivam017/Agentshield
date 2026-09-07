@@ -12,9 +12,11 @@ The release workflow re-downloads that artifact and verifies it again before pub
 
 Current validated example:
 
-- CI run: `34163204452`
-- commit: `1d17df429aad905320a9f3f2a80d212f81bd8ae7`
+- CI run: `34164374114` (run #283)
+- commit: `63aae9c24fd512c8195125e18d5dd75cae02ab10`
+- model artifact: `agentshield-risk-model-smoke-63aae9c24fd512c8195125e18d5dd75cae02ab10`
 - model version: `baseline-logistic-v1`
+- artifact digest: `sha256:93c1719fc75da7fa6710fb631f374789aa7299178d6d9927dbeafcf549763be8`
 
 Do not copy the model artifact into the repository. The release asset is the durable deployment source.
 
@@ -121,7 +123,7 @@ Do not mark the performance gate complete from syntax validation alone.
 
 Repository state currently proves:
 
-- full CI run #278 is green;
+- CI run #283 is green;
 - the CI model artifact is generated and checksum-verified;
 - the release workflow is committed and ready;
 - the Render Blueprint is committed and wired for staging variables.
