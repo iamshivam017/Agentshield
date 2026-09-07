@@ -14,6 +14,7 @@ COPY apps/api/app ./app
 COPY apps/api/src ./src
 COPY apps/api/alembic.ini ./alembic.ini
 COPY apps/api/migrations ./migrations
+COPY scripts/bootstrap_model.py ./scripts/bootstrap_model.py
 
 EXPOSE 8000
 
@@ -22,4 +23,4 @@ USER appuser
 
 HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "python scripts/bootstrap_model.py && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
