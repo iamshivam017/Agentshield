@@ -1,4 +1,4 @@
-.PHONY: install dev lint format typecheck test test-unit test-integration test-e2e security build db-migrate db-seed ml-all ml-verify perf-smoke db-backup-restore-smoke production-check verify verify-all infra-up infra-down
+.PHONY: install dev lint format typecheck test test-unit test-integration test-e2e security build db-migrate ml-all ml-verify perf-smoke db-backup-restore-smoke production-check verify verify-all infra-up infra-down
 
 PYTHONPATH := apps/api/src:apps/api
 ML_PYTHONPATH := ml/src
@@ -53,9 +53,6 @@ build:
 db-migrate:
 	cd apps/api && PYTHONPATH=src:app alembic upgrade head
 
-db-seed:
-	PYTHONPATH=$(PYTHONPATH) python scripts/seed.py
-
 ml-all:
 	PYTHONPATH=$(ML_PYTHONPATH) python -m agentshield_ml.train
 
@@ -63,13 +60,15 @@ ml-verify:
 	PYTHONPATH=$(ML_PYTHONPATH) python scripts/verify_model_artifact.py artifacts/risk
 
 perf-smoke:
-	PYTHONPATH=$(PYTHONPATH) python scripts/perf_smoke.py
+	k6 run --env AGENTSHIELD_BASE_URL="$(AGENTSHIELD_BASE_URL)" --env AGENT_ID="$(AGENT_ID)" --env MERCHANT_ID="$(MERCHANT_ID)" --env AGENT_API_KEY="$(AGENT_API_KEY)" --env K6_PROFILE=smoke perf/k6/risk-evaluate.js
 
 db-backup-restore-smoke:
 	bash scripts/backup_restore_smoke.sh
 
 production-check:
-	PYTHONPATH=$(PYTHONPATH) python scripts/production_check.py
+	curl --fail --silent --show-error "$(or $(AGENTSHIELD_BASE_URL),http://127.0.0.1:8000)/health/live"
+	curl --fail --silent --show-error "$(or $(AGENTSHIELD_BASE_URL),http://127.0.0.1:8000)/health/ready"
+	@echo "AgentShield health checks passed"
 
 verify: lint typecheck test build
 verify-all: verify security
