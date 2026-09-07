@@ -40,8 +40,10 @@ def test_development_without_model_configuration_is_allowed(monkeypatch: pytest.
     main()
 
 
-def test_staging_requires_complete_model_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_staging_requires_complete_model_configuration(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("APP_ENV", "staging")
+    monkeypatch.setenv("RISK_MODEL_ARTIFACT_PATH", str(tmp_path / "missing-model.joblib"))
+    monkeypatch.setenv("RISK_MODEL_METADATA_PATH", str(tmp_path / "missing-metadata.json"))
     for key in (
         "RISK_MODEL_ARTIFACT_URL",
         "RISK_MODEL_METADATA_URL",
