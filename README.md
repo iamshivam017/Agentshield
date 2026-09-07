@@ -87,11 +87,19 @@ For a running environment, use `make production-check` for health/readiness prob
 
 The Makefile is the source of truth for these local workflows. Keep real credentials out of committed `.env` files; use the repository environment template and local secret storage instead.
 
+### Render deployment
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/iamshivam017/Agentshield)
+
+The repository includes a Render Blueprint at `render.yaml` for the API, web UI, PostgreSQL, and Redis services. Render's Blueprint flow provisions the interconnected resources from that file; the unresolved values marked `sync: false` must be supplied in the Render dashboard. citeturn620737search2turn620737search4
+
 ### Current status
 
-**Repository engineering gate: PASS.** CI verifies API, ML, web, container, database-migration, backup/restore, browser E2E/accessibility, and k6 performance-script validation.
+**Repository engineering gate: PASS.** CI run **#280** on commit `98e2a4bacf9d22f35e56cd1a05a25cb924166fba` completed successfully across API, ML, web, performance-script validation, and container builds.
 
-**Production release: not yet declared.** Remaining gates require environment evidence: persistent model activation, Razorpay Test Mode execution and webhook replay, a selected deployment target, target performance measurements, centralized production telemetry, and rollback evidence.
+**Production release: not yet declared.** The remaining gates are intentionally environment-specific: persistent model activation, Razorpay Test Mode execution and webhook replay, target deployment evidence, target load/stress/soak measurements, centralized production telemetry, and rollback evidence.
+
+The durable `Release Risk Model` workflow requires an explicit `APPROVE` input, verifies the exact CI model artifact and metadata, and publishes an approved release copy. The published release artifact must still be activated in the running model registry through the protected admin lifecycle path.
 
 No production secrets or real payment credentials belong in this repository.
 
@@ -99,4 +107,4 @@ No production secrets or real payment credentials belong in this repository.
 
 AgentShield is defense-only. Payment demonstrations use provider test/sandbox environments. Never commit API keys, private credentials, payment card data, or other secrets.
 
-See `AGENTS.md` for engineering rules and `docs/` for the system specification.
+See `AGENTS.md` for engineering rules and `docs/` for the system specification and release runbooks.
