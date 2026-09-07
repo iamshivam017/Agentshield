@@ -63,7 +63,7 @@ Prerequisites: Docker Desktop, Python 3.12+, and Node.js 24+.
 make install
 
 # Start PostgreSQL + Redis and the application stack
-a make dev
+make dev
 ```
 
 For infrastructure-only startup:
