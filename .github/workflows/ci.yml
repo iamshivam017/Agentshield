@@ -180,6 +180,21 @@ jobs:
             grep -q "${profile}: {" perf/k6/risk-evaluate.js
           done
 
+  deployment-config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Validate deployment YAML
+        run: |
+          ruby -e 'require "yaml"; ARGV.each { |path| YAML.load_file(path, aliases: true); puts "YAML OK: #{path}" }'             render.yaml             .github/workflows/ci.yml             .github/workflows/release-model.yml             .github/workflows/staging-validation.yml
+      - name: Validate deployment shell scripts
+        run: |
+          bash -n scripts/promote_model.sh
+          bash -n scripts/backup_restore_smoke.sh
+          python -m py_compile scripts/bootstrap_model.py scripts/register_model_artifact.py
+          echo "Deployment helper syntax checks passed."
+
   container:
     runs-on: ubuntu-latest
     needs: [api, ml, web, performance-script]
