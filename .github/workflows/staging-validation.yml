@@ -51,10 +51,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p validation-results
-          k6 run             --summary-export="validation-results/k6-${K6_PROFILE}.json"             perf/k6/risk-evaluate.js
+          k6 run \
+            --summary-export="validation-results/k6-${K6_PROFILE}.json" \
+            perf/k6/risk-evaluate.js
 
       - name: Upload validation evidence
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: agentshield-staging-validation-${{ inputs.profile }}-${{ github.run_id }}
           path: validation-results/
