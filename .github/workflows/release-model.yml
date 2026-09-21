@@ -47,6 +47,30 @@ jobs:
         run: |
           test "$APPROVAL" = "APPROVE"
 
+      - name: Validate CI run identity and success
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.ci_run_id }}
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          actual_sha="$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json headSha --jq .headSha)"
+          conclusion="$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json conclusion --jq .conclusion)"
+          test "$actual_sha" = "$COMMIT_SHA"
+          test "$conclusion" = "success"
+          echo "CI run $RUN_ID is successful and targets $COMMIT_SHA"
+
+      - name: Refuse duplicate release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release tag $RELEASE_TAG already exists; refusing to overwrite it." >&2
+            exit 1
+          fi
+
       - name: Download verified CI model artifact
         env:
           GH_TOKEN: ${{ github.token }}
