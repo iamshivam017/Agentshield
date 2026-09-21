@@ -12,11 +12,11 @@ The release workflow re-downloads that artifact and verifies it again before pub
 
 Current validated example:
 
-- CI run: `34164374114` (run #283)
-- commit: `63aae9c24fd512c8195125e18d5dd75cae02ab10`
-- model artifact: `agentshield-risk-model-smoke-63aae9c24fd512c8195125e18d5dd75cae02ab10`
+- CI run: `34166263917` (run #284)
+- commit: `8a22fbbfb71bde17bf7044057e71c90a4d235fbf`
+- model artifact: `agentshield-risk-model-smoke-8a22fbbfb71bde17bf7044057e71c90a4d235fbf`
 - model version: `baseline-logistic-v1`
-- artifact digest: `sha256:93c1719fc75da7fa6710fb631f374789aa7299178d6d9927dbeafcf549763be8`
+- artifact digest: `sha256:59fe91c5c9a6ade614a3543d76479eaf3c47ff7aa841ac90191fae8390049b22`
 
 Do not copy the model artifact into the repository. The release asset is the durable deployment source.
 
@@ -83,6 +83,8 @@ The API bootstrap helper downloads the configured artifact and metadata before s
 
 A missing or incomplete staging model configuration must fail closed.
 
+After bootstrap, the API container automatically registers the verified artifact in the model registry as `TRAINED` (idempotently, with checksum enforcement). It does not bypass the governed promotion lifecycle.
+
 ## 5. Render web service
 
 The `agentshield-web` service receives the internal API target from the Render Blueprint. The application-side proxy normalizes the target to a usable HTTP URL before forwarding requests.
@@ -104,6 +106,8 @@ After deployment, verify in this order:
 9. webhook replay and stale-event protection
 10. reconciliation / recovery behavior
 
+For repeatable target validation, use GitHub Actions → `Staging Validation` with the deployed API URL. The workflow checks liveness/readiness, then runs the selected k6 profile and uploads the result JSON as evidence. Set repository/environment secrets `AGENT_ID`, `MERCHANT_ID`, and `AGENT_API_KEY` before running it.
+
 Record the exact deployment URL, model release tag, model SHA-256, and test transaction IDs in release evidence.
 
 ## 7. Performance gate
@@ -123,8 +127,9 @@ Do not mark the performance gate complete from syntax validation alone.
 
 Repository state currently proves:
 
-- CI run #283 is green;
+- CI run #284 is green;
 - the CI model artifact is generated and checksum-verified;
+- the API image now idempotently registers the verified model artifact at startup;
 - the release workflow is committed and ready;
 - the Render Blueprint is committed and wired for staging variables.
 
