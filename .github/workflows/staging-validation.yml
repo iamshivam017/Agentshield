@@ -1,0 +1,61 @@
+name: Staging Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Deployed AgentShield API base URL"
+        required: true
+        type: string
+      profile:
+        description: "k6 validation profile"
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - load
+          - stress
+          - soak
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Validate target liveness
+        env:
+          BASE_URL: ${{ inputs.base_url }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error "${BASE_URL%/}/health/live"
+          curl --fail --silent --show-error "${BASE_URL%/}/health/ready"
+          echo
+          echo "Target health checks passed."
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1.2.1
+
+      - name: Run k6 validation
+        env:
+          AGENTSHIELD_BASE_URL: ${{ inputs.base_url }}
+          AGENT_ID: ${{ secrets.AGENT_ID }}
+          MERCHANT_ID: ${{ secrets.MERCHANT_ID }}
+          AGENT_API_KEY: ${{ secrets.AGENT_API_KEY }}
+          K6_PROFILE: ${{ inputs.profile }}
+        run: |
+          set -euo pipefail
+          mkdir -p validation-results
+          k6 run             --summary-export="validation-results/k6-${K6_PROFILE}.json"             perf/k6/risk-evaluate.js
+
+      - name: Upload validation evidence
+        uses: actions/upload-artifact@v6
+        with:
+          name: agentshield-staging-validation-${{ inputs.profile }}-${{ github.run_id }}
+          path: validation-results/
+          if-no-files-found: error
