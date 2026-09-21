@@ -24,4 +24,4 @@ USER appuser
 
 HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"
 
-CMD ["sh", "-c", "PYTHONPATH=/app/src alembic upgrade head && python scripts/bootstrap_model.py && PYTHONPATH=/app/src:/app python scripts/register_model_artifact.py /tmp/agentshield-model && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "PYTHONPATH=/app/src alembic upgrade head && python scripts/bootstrap_model.py && if [ -f /tmp/agentshield-model/model.joblib ] && [ -f /tmp/agentshield-model/metadata.json ]; then PYTHONPATH=/app/src:/app python scripts/register_model_artifact.py /tmp/agentshield-model; fi && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
