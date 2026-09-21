@@ -73,6 +73,7 @@
 - [x] Artifact SHA-256 checksum generation and registry metadata
 - [x] CI runtime training smoke with verified artifact hand-off
 - [x] API serving path verifies model artifact checksum before load
+- [x] Verified deployment artifact auto-registration at API startup (idempotent/checksum-checked)
 - [x] Persisted model lifecycle governance: TRAINED → EVALUATED → CANDIDATE → APPROVED → ACTIVE → RETIRED
 - [x] Admin-only model lifecycle mutation endpoints
 - [ ] Final trained model promoted to APPROVED/ACTIVE with persisted production artifact
@@ -204,6 +205,7 @@
 - [x] Render Deploy button documented in README
 - [x] Backup/restore drill
 - [x] Durable GitHub model-release workflow prepared
+- [x] Repeatable GitHub Actions staging validation workflow prepared (health + k6 evidence)
 
 ## CI verification
 
@@ -231,6 +233,7 @@
 - [x] CI run #279 fully green on commit `58353baf90a08e9b9cb41ab3e1769b2426913c0b`
 - [x] CI run #280 fully green on commit `98e2a4bacf9d22f35e56cd1a05a25cb924166fba`
 - [x] CI run #283 fully green on commit `63aae9c24fd512c8195125e18d5dd75cae02ab10`
+- [x] CI run #284 fully green on commit `8a22fbbfb71bde17bf7044057e71c90a4d235fbf`
 
 ## Release gates still requiring environment-specific evidence
 
