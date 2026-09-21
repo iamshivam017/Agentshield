@@ -95,11 +95,11 @@ The repository includes a Render Blueprint at `render.yaml` for the API, web UI,
 
 ### Current status
 
-**Repository engineering gate: PASS.** CI run **#283** on commit `63aae9c24fd512c8195125e18d5dd75cae02ab10` completed successfully across API, ML, web, performance-script validation, and container builds.
+**Repository engineering gate: PASS.** CI run **#284** on commit `8a22fbbfb71bde17bf7044057e71c90a4d235fbf` completed successfully across API, ML, web, performance-script validation, and container builds.
 
 **Production release: not yet declared.** The remaining gates are intentionally environment-specific: persistent model activation, Razorpay Test Mode execution and webhook replay, target deployment evidence, target load/stress/soak measurements, centralized production telemetry, and rollback evidence.
 
-The durable `Release Risk Model` workflow requires an explicit `APPROVE` input, verifies the exact CI model artifact and metadata, and publishes an approved release copy. The published release artifact must still be activated in the running model registry through the protected admin lifecycle path.
+The durable `Release Risk Model` workflow requires an explicit `APPROVE` input, verifies the exact CI model artifact and metadata, and publishes an approved release copy. On deployment, the API automatically registers that verified artifact idempotently as `TRAINED`; the published model still must be promoted through the protected admin lifecycle path to become `ACTIVE`. The `Staging Validation` workflow then provides repeatable health and k6 evidence against the deployed API.
 
 No production secrets or real payment credentials belong in this repository.
 
